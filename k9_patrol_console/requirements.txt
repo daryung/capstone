@@ -1,0 +1,9 @@
+# unitree_webrtc_connect: keep your existing working installation.
+# If installing into a NEW environment, install that driver separately.
+numpy
+opencv-python
+ultralytics
+
+# Robot microphone speech detection and local Korean STT
+av
+faster-whisper>=1.1.0

@@ -1,0 +1,40 @@
+{
+  "audio_path": "/mnt/c/Users/SAMSUNG/OneDrive/바탕 화면/k9_patrol_console (2)/k9_patrol_console/recordings/test.wav",
+  "created_at": "2026-11-02T19:45:12.069006+09:00",
+  "model": "small",
+  "device": "cpu",
+  "compute_type": "int8",
+  "language": "ko",
+  "duration_seconds": 17.56,
+  "processing_seconds": 3.317,
+  "vad_enabled": true,
+  "text": "살려주세요\n도와주세요\n살려주세요\n도와주세요\n살려주세요",
+  "segments": [
+    {
+      "start_seconds": 4.69,
+      "end_seconds": 6.69,
+      "text": "살려주세요"
+    },
+    {
+      "start_seconds": 6.69,
+      "end_seconds": 8.69,
+      "text": "도와주세요"
+    },
+    {
+      "start_seconds": 8.69,
+      "end_seconds": 10.69,
+      "text": "살려주세요"
+    },
+    {
+      "start_seconds": 10.69,
+      "end_seconds": 12.69,
+      "text": "도와주세요"
+    },
+    {
+      "start_seconds": 12.69,
+      "end_seconds": 14.69,
+      "text": "살려주세요"
+    }
+  ],
+  "note": "자동 음성 인식 결과입니다. 원본 음성으로 확인하세요. 시간은 파일 시작 기준입니다."
+}
