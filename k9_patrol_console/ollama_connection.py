@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import urllib.request
+import urllib.error
 
 _URL = os.environ.get('K9_OLLAMA_URL', 'http://127.0.0.1:11434').rstrip('/')
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -15,6 +16,10 @@ _LOCK = threading.Lock()
 _READY = threading.Event()
 _ERROR = ''
 _PS = None
+try:
+    REQUEST_TIMEOUT=max(60,min(3600,int(os.environ.get('K9_OLLAMA_TIMEOUT','600'))))
+except ValueError:
+    REQUEST_TIMEOUT=600
 
 
 def _powershell(script, payload=None, timeout=35):
@@ -26,7 +31,10 @@ def _powershell(script, payload=None, timeout=35):
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             encoding='utf-8', errors='replace', timeout=timeout)
     if result.returncode:
-        raise RuntimeError('Windows Ollama 요청 실패: ' + result.stderr.strip()[-600:])
+        message=result.stderr.strip()[-600:]
+        if any(word in message.lower() for word in ('timed out','시간이 초과','시간 초과','시간을 초과')):
+            raise TimeoutError('Windows Ollama 응답 제한 시간 초과')
+        raise RuntimeError('Windows Ollama 요청 실패: ' + message)
     return json.loads(result.stdout.lstrip('\ufeff').strip())
 
 
@@ -106,10 +114,18 @@ def chat(payload):
         raise RuntimeError('Ollama 시작 대기 시간 초과. 잠시 후 다시 시도하세요.')
     if _ERROR:
         ensure_connection()
-    if _BRIDGE:
-        return _powershell(r'''
+    try:
+        if _BRIDGE:
+            script=r'''
 $body = [Console]::In.ReadToEnd();
-$r = Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/chat' -Method Post -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body)) -TimeoutSec 240;
+$r = Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/chat' -Method Post -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body)) -TimeoutSec __TIMEOUT__;
 $r | ConvertTo-Json -Depth 100 -Compress;
-''', payload, timeout=250)
-    return _http('/api/chat', payload, timeout=240)
+'''.replace('__TIMEOUT__',str(REQUEST_TIMEOUT))
+            return _powershell(script,payload,timeout=REQUEST_TIMEOUT+20)
+        return _http('/api/chat',payload,timeout=REQUEST_TIMEOUT)
+    except (TimeoutError,subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f'LLM 응답 대기 {REQUEST_TIMEOUT}초 초과. 설정에서 현재 순찰·최대 3개로 줄여 다시 시도하세요. Windows Ollama 상태도 확인하세요.') from exc
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason,TimeoutError):
+            raise RuntimeError(f'LLM 응답 대기 {REQUEST_TIMEOUT}초 초과. 현재 순찰·최대 3개로 줄여 다시 시도하세요.') from exc
+        raise

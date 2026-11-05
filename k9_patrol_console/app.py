@@ -11,7 +11,7 @@ from urllib.parse import urlparse,parse_qs,unquote
 from controller import Controller
 from storage import Store
 from vision import Vision
-from summarizer import Summarizer
+from highlights import HighlightsService
 from ollama_connection import start_background
 from audio_control import AudioControl
 from speech import SpeechRecorder
@@ -22,7 +22,7 @@ ROOT=Path(__file__).parent
 
 def serve(args):
     start_background()
-    store=Store(args.data);vision=Vision(store);robot=Controller(vision);llm=Summarizer(store)
+    store=Store(args.data);vision=Vision(store);robot=Controller(vision);llm=HighlightsService(store)
     audio=AudioControl(robot);robot.audio=audio
     speech=SpeechRecorder(store,robot,vision);robot.speech=speech
     audio_root=store.root/'audio'
@@ -51,7 +51,7 @@ def serve(args):
                     if kind in ('auto','manual'):records=[r for r in records if r['type']==kind]
                     elif kind=='excluded':records=[r for r in records if r['excluded']]
                     self.reply(200,records,download='k9-records.json' if path.endswith('export') else '')
-                elif path=='/api/summaries':self.reply(200,store.summaries())
+                elif path=='/api/highlights/history':self.reply(200,store.highlights())
                 elif path=='/api/video':
                     self.send_response(200);self.send_header('Content-Type','multipart/x-mixed-replace; boundary=frame');self.send_header('Cache-Control','no-store');self.end_headers()
                     try:
@@ -101,7 +101,8 @@ def serve(args):
                 if not 0<size<=20000:raise ValueError('요청 크기 오류')
                 data=json.loads(self.rfile.read(size));out={'ok':True}
                 if self.path=='/api/speech/config':speech.configure(data)
-                elif self.path=='/api/speech/resume':speech.resume()
+                elif self.path=='/api/speech/start':out=speech.start()
+                elif self.path=='/api/speech/stop':out=speech.stop()
                 elif self.path=='/api/audio/list':audio.start('list')
                 elif self.path=='/api/audio/play':audio.start('play',uid=data.get('id'))
                 elif self.path=='/api/audio/pause':audio.start('pause')
@@ -123,13 +124,13 @@ def serve(args):
                 elif self.path=='/api/record':
                     if not isinstance(data.get('excluded',False),bool):raise ValueError('제외 상태 오류')
                     store.edit(data['id'],str(data.get('note','')),str(data.get('keywords','')),data.get('excluded',False))
-                elif self.path=='/api/summarize':
+                elif self.path=='/api/highlights':
                     records=store.list(str(data.get('q','')),str(data.get('target','')),str(data.get('session','')),False)
                     records=[r for r in records if r['state'] in ('ready','partial')]
                     kind=data.get('kind','all')
                     if kind in ('auto','manual'):records=[r for r in records if r['type']==kind]
                     elif kind=='excluded':records=[]
-                    llm.start(records,data.get('model','qwen3.5:4b'))
+                    llm.start(records,data.get('model','qwen3.5:4b'),data.get('limit',5),'현재 순찰' if data.get('session') else '전체 기록')
                 else:self.reply(404,{'error':'Not found'});return
                 self.reply(200,out)
             except Exception as exc:self.reply(400,{'error':str(exc)})

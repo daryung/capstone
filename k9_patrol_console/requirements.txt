@@ -7,3 +7,6 @@ ultralytics
 # Robot microphone speech detection and local Korean STT
 av
 faster-whisper>=1.1.0
+
+# Korean labels on video (English fallback when a Korean font is absent)
+pillow

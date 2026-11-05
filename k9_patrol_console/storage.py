@@ -25,6 +25,9 @@ class Store:
             db.execute('''CREATE TABLE IF NOT EXISTS summaries (
             id TEXT PRIMARY KEY, time TEXT, model TEXT, source_ids TEXT, content TEXT)''')
 
+            db.execute('''CREATE TABLE IF NOT EXISTS highlights (
+            id TEXT PRIMARY KEY, time TEXT, model TEXT, source_ids TEXT, content TEXT)''')
+
     def connection(self):
         return sqlite3.connect(self.db, timeout=10)
 
@@ -60,7 +63,7 @@ class Store:
             if session and r['session'] != session:continue
             if target and target not in r['targets']:continue
             if not include_excluded and r['excluded']:continue
-            hay = ' '.join([r['title'], r['note'], r['keywords'], ' '.join(r['targets']), str(r['metadata'].get('transcript',''))]).casefold()
+            hay = ' '.join([r['title'], r['note'], r['keywords'], ' '.join(r['targets']), str(r['metadata'].get('transcript','')), ' '.join(d.get('posture',{}).get('label','') for d in r['metadata'].get('detections',[]))]).casefold()
             if query.casefold() not in hay:continue
             out.append(r)
         return out
@@ -85,3 +88,19 @@ class Store:
         with self.connection() as db:
             db.row_factory = sqlite3.Row
             return [dict(r) for r in db.execute('SELECT * FROM summaries ORDER BY time DESC LIMIT 30')]
+
+
+    def save_highlights(self, model, ids, content):
+        rid=uuid.uuid4().hex
+        with self.connection() as db:
+            db.execute('INSERT INTO highlights VALUES (?,?,?,?,?)',
+                       (rid,utc_now(),model,json.dumps(ids),json.dumps(content,ensure_ascii=False)))
+        return rid
+
+    def highlights(self):
+        with self.connection() as db:
+            db.row_factory=sqlite3.Row
+            rows=[dict(r) for r in db.execute('SELECT * FROM highlights ORDER BY time DESC LIMIT 30')]
+        for r in rows:
+            r['source_ids']=json.loads(r['source_ids']);r['content']=json.loads(r['content'])
+        return rows

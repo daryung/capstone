@@ -9,6 +9,8 @@ import threading
 import time
 import uuid
 
+from posture_rules import classify_posture,draw_postures
+
 TARGET_IDS={'person':0,'backpack':24,'handbag':26,'suitcase':28}
 
 
@@ -116,10 +118,11 @@ class Vision:
                 item=dict(target=r.names[int(b.cls[0])],confidence=float(b.conf[0]),xyxy=[float(v) for v in b.xyxy[0].tolist()])
                 if r.keypoints is not None and len(r.keypoints.data)>i:
                     item['keypoints']=r.keypoints.data[i].tolist()
-                    item['pose_status']='관절 추정 · 쓰러짐 여부 미판정'
+                    item['posture']=classify_posture(item['keypoints'],item['xyxy'])
+                    item['pose_status']=item['posture']['label']
                 detections.append(item)
         # Annotations belong to this analyzed frame, not an unrelated newer frame.
-        return detections,self.encode(r.plot())
+        return detections,self.encode(draw_postures(r.plot(),detections))
 
     async def detect(self):
         try:
