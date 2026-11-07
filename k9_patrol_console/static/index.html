@@ -1,16 +1,451 @@
 <!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>K9 PATROL · 순찰 관제</title><style>
+:root{
+ --bg:#e9edf1;--glass:rgba(255,255,255,.74);--glass-strong:rgba(255,255,255,.9);--solid:#fff;--sunken:rgba(241,244,247,.8);
+ --line:rgba(17,24,39,.10);--line-strong:rgba(17,24,39,.18);
+ --text:#111827;--text-2:#1f2937;--muted:#4b5563;--faint:#6b7280;
+ --navy:#1d3557;--navy-600:#16294a;--navy-50:#e8edf5;
+ --ok:#15803d;--warn:#b45309;--err:#b91c1c;--idle:#9ca3af;
+ --stand:#15803d;--sit:#1d4ed8;--lie:#b91c1c;--unk:#6b7280;
+ --r:6px;--r-s:4px;--blur:saturate(1.3) blur(14px);
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--text);font:14px/1.6 Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Noto Sans KR",sans-serif;font-variant-numeric:tabular-nums;
+ background:linear-gradient(rgba(17,24,39,.035) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(17,24,39,.035) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(180deg,#f3f5f8,var(--bg) 420px);background-attachment:fixed}
+button,input,select,textarea{font:inherit;color:inherit}
+h2{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+h3{font-size:15px;margin:8px 0}
+a{color:var(--navy);font-weight:600;text-underline-offset:3px}
+.hidden{display:none!important}
+.mono,.tiny{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.tiny{font-size:11.5px;color:var(--faint)}
+.sub,.muted{color:var(--muted)}
+.note{font-size:13px;line-height:1.7;margin:8px 0;color:var(--muted)}
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>K9 순찰</title><style>
-:root{--bg:#101316;--panel:#181d22;--line:#30383f;--muted:#98a5af;--green:#a7d9c1}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#e8edef;font:14px system-ui,-apple-system,'Noto Sans KR',sans-serif}button,input,select,textarea{font:inherit}button{padding:9px 12px;border:1px solid #3e494f;border-radius:6px;background:#242c32;color:#e8edef;cursor:pointer}button:hover{border-color:var(--green)}button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--green);outline-offset:3px}.primary{background:var(--green);border-color:var(--green);color:#16251f}.stop{background:#462b2d;border-color:#78484d;color:#ffd3d3}.app{max-width:1480px;margin:auto;padding:22px 28px}header{display:flex;gap:12px;align-items:center;padding-bottom:18px;border-bottom:1px solid var(--line)}.logo{font:700 18px monospace;color:var(--green);border:1px solid #4e6b5e;padding:10px;border-radius:7px}.brand{font-weight:650;font-size:17px;letter-spacing:1px}.sub,.muted,.note,.tiny{color:var(--muted)}.sub{font-size:11px;line-height:1.6}.right{margin-left:auto;display:flex;gap:10px;align-items:center}.pill{font-size:12px;color:var(--green)}.heading{padding:16px 0}.heading nav{display:flex;gap:8px}nav button{background:transparent;border-color:transparent}nav button.active{background:#26372f;color:var(--green);border-color:#405c4e}.notice{padding:10px 14px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:11px;line-height:1.7;margin-bottom:16px}.grid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:18px;align-items:start}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}.bar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}h2{font-size:14px;font-weight:600;margin:0}h3{font-size:16px;margin:10px 0}.tiny{font:10px monospace}.view{height:410px;position:relative;background:#0b0f12}.cameraempty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;text-align:center;pointer-events:none}.cameraempty strong{font-size:16px;font-weight:500}.cameraempty p{font-size:12px;color:var(--muted);line-height:1.8}.stamp{position:absolute;bottom:12px;left:14px;color:var(--muted);font:11px monospace}.metrics{display:flex;padding:10px 18px;gap:18px;font-size:11px;color:var(--muted)}.metric{display:flex;gap:8px}.metric b{font-size:11px;font-weight:500}.metric:nth-child(n+2){display:none}.verification,.bottom{margin-top:18px}.manualbadge{font-size:10px;color:var(--muted)}.verifybody{display:grid;grid-template-columns:160px 1fr;gap:20px;padding:18px}.timerbox{padding:12px;border:1px solid var(--line);border-radius:6px}.timerbox strong{display:block;font:30px monospace;margin:12px 0}.timerbox p,.timerbox small{font-size:10px;line-height:1.6;color:var(--muted)}.timerbox button{display:block;width:100%;font-size:11px;padding:8px;margin:6px 0}.timerbox small{display:block}.fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:12px;color:var(--muted)}.verifybody label{display:block;margin-bottom:12px}.verifybody input,.verifybody select{margin-top:6px;width:100%}input[type=text],input[type=number],textarea,select{background:#11171c;color:#e8edef;border:1px solid #38444c;border-radius:6px;padding:10px;min-width:0}input[type=text],textarea{width:100%}textarea{height:80px;resize:vertical}.note{font-size:11px;line-height:1.8;margin:10px 0}.actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}.actions input{flex:1;min-width:80px}.full{width:100%}.aibody{padding:16px}.settings{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}summary{cursor:pointer;font-size:12px;color:var(--muted)}.feature{padding-top:12px}.tags{display:flex;gap:8px}.tags label,.switch{display:flex;align-items:center;gap:8px;font-size:11px;margin:10px 0}.range{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11px}.range input{width:105px;accent-color:var(--green)}input[type=checkbox]{accent-color:var(--green)}.sample{font-size:12px;line-height:1.8;color:var(--muted);white-space:pre-line;margin:12px 0}.eventlist{font-size:11px;line-height:1.8;color:var(--muted)}.event{padding:8px 0;border-top:1px solid var(--line)}.composer{padding:16px;border-top:1px solid var(--line)}.composer p{font-size:12px;color:var(--muted)}.control{margin:0;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;padding:16px}.controlbody{margin-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}.dpad{display:grid;grid-template-columns:repeat(3,42px);gap:5px}.dpad button{padding:0;height:37px;font-size:18px;touch-action:none;user-select:none}.held{background:var(--green);color:#15231d}.controlinfo{flex:1;min-width:130px}.controlinfo b{font-size:12px}.controlinfo p{font-size:11px;line-height:1.7;color:var(--muted)}.pose{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0}.pose button{font-size:10px;padding:8px}.audioarea{padding:18px;border-top:1px solid var(--line)}.audiotitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.audioupload,.audioplay{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}.audioupload input{flex:1;min-width:180px;font-size:12px}.audioplay select{flex:1;min-width:160px}.audioarea button{font-size:12px}.chips{display:flex;gap:7px;flex-wrap:wrap}.chips button{font-size:11px;padding:7px 10px}.searchAssist{padding:18px;border-bottom:1px solid var(--line)}.filters{padding:16px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.filters input{flex:1;min-width:150px}.records{padding:0 18px 18px}.record{display:flex;align-items:start;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}.record img{width:115px;max-height:90px;object-fit:cover;border-radius:5px}.recordmain{flex:1;min-width:0}.record p{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.record input,.record textarea{margin-top:10px}.record audio{display:block;width:100%;max-width:520px;margin:10px 0}.record video{width:100%;max-width:520px;margin-top:10px}.excluded{opacity:.6}.empty{padding:28px;text-align:center;color:var(--muted)}a{color:var(--green)}.source{display:block;margin:6px 0;padding:10px;overflow-wrap:anywhere}.hidden{display:none!important}.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:90vw;background:#c9e4d8;color:#172820;padding:12px 18px;border-radius:6px;font-size:12px;z-index:20}#llmStatus,#connectionState,#audioStatus{overflow-wrap:anywhere}#reportText{font-size:13px}.settingsbody .note{font-size:10px}
-@media(max-width:1050px){.grid{grid-template-columns:minmax(0,1fr) 300px}.verifybody{grid-template-columns:1fr}.timerbox{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.timerbox strong{margin:0}.timerbox button{width:auto}.timerbox small{width:100%}}@media(max-width:780px){.grid{grid-template-columns:1fr}.view{height:330px}.app{padding:16px}.fieldrow{grid-template-columns:1fr}.right{gap:7px}header .sub{max-width:180px}#report .actions input{min-width:100px}.record{flex-wrap:wrap}}@media(max-width:420px){header{flex-wrap:wrap}.right{margin-left:0}.view{height:240px}.heading nav{gap:3px}nav button{font-size:12px;padding:9px}.audioplay button{padding:9px 10px}}
-</style><style>
-.app{max-width:1360px;padding:18px 24px}header{padding-bottom:12px}.heading{padding:10px 0}.brand{font-size:15px}.logo{padding:8px}.grid{grid-template-columns:minmax(0,1fr) 280px;gap:14px}.view{height:480px}.bar{padding:12px 14px}.aibody,.control{padding:14px}.verification,.bottom{margin-top:14px}.verifybody{padding:12px 14px;grid-template-columns:155px 1fr;gap:14px;align-items:start}.timerbox{border:0;padding:0}.timerbox strong{font-size:27px;margin:0 0 8px}.timerbox p{font-size:10px;margin:6px 0}.timerbox button{display:inline-block;width:auto;padding:7px 10px}.audioarea{padding:12px 14px}.audiotitle{margin-bottom:8px}.audiotitle .sub{display:none}.audioarea button{padding:8px 10px}.compactdetail summary,.bottom summary{padding:10px 0}.detailbody{padding-top:12px}.bottom{padding:0 14px}.bottom .detailbody>div{padding:0 0 14px!important;gap:8px!important}.settingsbody .sample{font-size:11px}.metrics{padding:8px 14px}.quiet-status{display:none}.quiet-status.error-visible{display:block;color:#f1b7b7}.composer{padding:12px 14px}.settings{margin-top:10px;padding-top:10px}.eventlist{display:none}.sample{padding:0;margin:10px 0}#audioStatus,#connectionState{font-size:10px;line-height:1.5}#audioStatus:empty{display:none}.controlbody{justify-content:center}.controlinfo{flex-basis:100%}.range{justify-content:center}.pose{justify-content:center}#report .bar h2{font-size:0}#report .bar h2:after{content:'LLM';font-size:14px}.fieldrow{grid-template-columns:1fr}.verifybody label{font-size:11px}button{font-size:12px}.notice{font-size:10px}header .sub:empty{display:none}.audioarea input[type=file]{font-size:11px}.timerbox strong{display:inline-block}.audioupload{margin-top:0}.audioarea select{font-size:12px}#capture{padding:6px 12px}.manualbadge{display:none}@media(max-width:850px){.grid{grid-template-columns:1fr}.view{height:350px}.controlbody{justify-content:start}.controlinfo{flex-basis:auto}.range,.pose{justify-content:start}}@media(max-width:520px){.app{padding:12px}.view{height:260px}.verifybody{grid-template-columns:1fr}.right{margin-left:auto}header{flex-wrap:nowrap}.brand{font-size:13px}.right button{padding:8px}.pill{font-size:10px}}
-</style><style>
-.app{max-width:1100px;padding:18px 24px}.heading{padding:10px 0}.heading nav{gap:6px}.grid{display:block}.view{height:500px}.metrics{display:none}.bottom{margin-top:12px;padding:0}.quicknote{padding:12px 14px;display:flex;align-items:stretch;gap:10px}.quicknote textarea{height:68px;flex:1}.quickactions{display:flex;align-items:center}.main-highlights{margin-top:12px}.main-highlights>.bar h2{font-size:14px!important}.main-highlights>.bar h2:after{content:none!important}.main-highlights>div:not(.bar){padding:14px!important}.summaryactions{display:flex;justify-content:flex-end}.main-highlights #llmStatus{font-size:11px}.main-highlights #reportText{height:180px!important}.summarydetails{margin-top:12px}.main-highlights #reportSources,.main-highlights #summaryHistory{font-size:12px}.main-highlights #reportDownload{font-size:11px}.main-highlights #reportText{margin-top:4px!important}.noteoptions{padding:14px}.noteoptions input{margin-top:8px}.settingshead{display:flex;justify-content:space-between;align-items:center;padding:0 0 16px;border-bottom:1px solid var(--line)}dialog{background:var(--panel);color:#e8edef;border:1px solid var(--line);border-radius:10px;width:min(720px,calc(100vw - 28px));max-height:88vh;overflow-y:auto;padding:20px}dialog::backdrop{background:#000a}#settingsContents>.ai{border:0;border-radius:0}#settingsContents>.ai>.bar{display:none}#settingsContents .aibody{padding:14px 0}#settingsContents .control{padding:14px 0}#settingsContents .controlbody{justify-content:start}#settingsContents .controlinfo{flex-basis:auto}#settingsContents .range,#settingsContents .pose{justify-content:start}#settingsContents>.audioarea{padding:16px 0}#settingsContents .verification{border:0;border-top:1px solid var(--line);border-radius:0}#settingsContents .verification .bar{padding:14px 0}#settingsContents .verifybody{padding:14px 0}#settingsContents .composer{display:none}#settingsContents>#connect{display:none}.modellabel{display:block;padding:14px 0 8px}#settingsContents>#model{width:100%}#settingsDialog .settingsbody{max-width:100%}.right{margin-left:auto}.brand{font-size:14px}#liveTab,#recordsTab{font-size:12px}.cameraempty p{display:none}@media(max-width:650px){.app{padding:12px}.view{height:300px}.quicknote{padding:10px}.main-highlights>div:not(.bar){padding:12px!important}header .sub{display:none}.right{gap:6px}.right button{padding:8px;font-size:11px}}@media(max-width:420px){.view{height:230px}.brand{font-size:12px}.logo{padding:6px}.pill{font-size:9px}}
-</style><style>
-#report>.bar h2{font-size:14px!important}#report>.bar h2:after{content:none!important}
-.highlight-card{padding:16px 0;border-top:1px solid var(--line)}.highlight-head{display:flex;gap:14px;align-items:flex-start}.highlight-head img{width:140px;max-height:120px;object-fit:cover;border-radius:6px}.highlight-body{flex:1;min-width:0}.highlight-reason{font-size:13px;line-height:1.8;white-space:pre-wrap;margin:6px 0;overflow-wrap:anywhere}.highlight-card details{margin:10px 0}.highlight-card audio,.highlight-card video{width:100%;max-width:560px;display:block;margin-top:10px}.highlight-card>a{display:inline-block;margin:6px 12px 6px 0;font-size:12px}.highlight-card>button{font-size:11px}.evidence-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);font-size:12px;line-height:1.7}.highlight-card details b{display:block;margin-top:12px;font-size:12px}@media(max-width:540px){.highlight-head{flex-direction:column}.highlight-head img{width:100%;max-height:180px}.highlight-card{padding:12px 0}}
-</style></head><body><main class="app"><header><div class="logo">K9</div><div><div class="brand">K9 PATROL</div><div class="sub"></div></div><div class="right"><span class="pill" id="badge">● 미연결</span><button id="openAudio">오디오 재생</button><button id="openSettings">설정</button></div></header><div class="heading"><nav><button class="active" id="liveTab">관제</button><button id="recordsTab">기록<span id="count" style="margin-left:6px">0</span></button><button id="speechMenu">음성</button></nav></div><div class="notice quiet-status" id="notice">로컬 관제 · 실제 로봇 연결 전입니다. 미연결 기능은 결과를 생성하지 않습니다.</div><section id="live"><div class="grid"><div class="panel"><div class="bar"><h2>순찰 전방 영상</h2><button class="primary full" id="capture" style="margin-top:10px">캡처</button></div><div class="view"><img alt="Go2 실시간 전방 영상" id="camera" style="width:100%;height:100%;object-fit:contain;visibility:hidden"/><div class="cameraempty" id="videoWaiting"><strong>미연결</strong></div><div class="stamp" id="clock"></div></div><p class="note" id="postureLive" role="status" style="padding:0 14px">자세 추정 대기</p><div class="metrics"><div class="metric"><span class="tiny">로봇 제어 모드</span><b id="robotState">미연결</b></div></div></div></div><div class="panel bottom"><div class="bar"><h2>기록</h2><div class="actions" style="margin:0"><span class="note" id="recordingState" role="status">녹음 대기</span><button id="speechRecord">녹음 시작</button></div></div><div class="quicknote"><textarea aria-label="관찰 기록" id="note" placeholder="짧게 기록하세요"></textarea><div class="quickactions"><button class="primary" id="save">저장</button></div></div></div><section class="panel main-highlights" id="report"><div class="bar"><h2>중요 기록·장면</h2><button class="primary" id="generate">선정</button></div><div style="padding:14px"><p class="note" id="llmStatus" role="status">저장된 기록에서 확인할 장면을 선정하세요.</p><div id="highlightCards"><p class="empty">선정 전</p></div><div class="actions"><button id="reportDownload">선정 결과 다운로드</button></div><details class="summarydetails"><summary>이전 선정</summary><div id="summaryHistory"></div></details></div></section></section><section class="hidden" id="archive"><div class="panel"><div class="bar"><h2>순찰 사건 기록</h2><button id="export">내보내기</button></div><div class="searchAssist"><h3></h3><div class="chips"><button data-target="person">사람 관찰 장면</button><button data-target="speech">음성 기록</button><button data-target="">전체 대상</button></div><div class="actions"><label>현재 활동만 <input id="sessionOnly" type="checkbox"/></label><span class="sub" id="targetFilter">전체 대상</span></div></div><div class="filters"><label for="filter">표시</label><select id="filter"><option value="all">전체 기록</option><option value="auto">자동 기록</option><option value="manual">수동 기록</option><option value="excluded">제외한 기록</option></select><input aria-label="기록 검색" id="search" placeholder="제목·키워드·메모 검색" type="text"/><button id="reportTab">중요 장면</button></div><div class="records" id="records"></div></div><div class="notice" style="margin-top:16px">기록·영상은 실행 폴더의 data에 저장됩니다. 내보낸 JSON에는 영상 파일 자체가 포함되지 않습니다.</div></section></main><div class="toast hidden" id="toast" role="status"></div><dialog aria-labelledby="settingsTitle" id="settingsDialog"><div class="settingshead"><h2 id="settingsTitle">설정</h2><button aria-label="설정 닫기" id="closeSettings">닫기</button></div><div id="settingsContents"><button id="connect">연결</button><aside class="panel ai"><div class="bar"><h2>연결</h2><span class="tiny"></span></div><div class="aibody"><label for="robotIp">Go2 IP</label><div class="actions"><input id="robotIp" type="text" value="192.168.0.101"/><button class="primary" id="connect2">연결</button><button id="disconnect">해제</button></div><p class="note" id="connectionState" role="status">미연결</p><details class="settings"><summary>자세 추정·자동 저장</summary><div class="settingsbody"><div class="feature"><label for="visionModel">비전 모델</label><select id="visionModel"><option value="yolo11n-pose.pt">자세 추정 · Nano</option><option value="yolo11s-pose.pt">자세 추정 · Small</option><option value="yolo11n.pt">사람 탐지 · Nano</option></select><p class="note">서 있음·앉아 있음·누워 있음 후보 표시 · 가림 시 판단 불가</p><div class="tags"><label><input checked="" name="target" type="checkbox" value="person"/>사람만 관찰</label></div><label for="confidence">탐지 점수 기준</label><input id="confidence" max="0.95" min="0.1" step="0.05" type="range" value="0.45"/><span id="confidenceValue">0.45</span><div class="sample" id="detectionStatus" role="status">탐지 모델 대기</div></div><div class="feature"><label class="switch"><input checked="" id="autoCapture" type="checkbox"/> 사람 등장 시 전후 영상 저장</label><div class="range"><label for="cooldown">최소 저장 간격</label><select id="cooldown"><option value="5">5초</option><option selected="" value="10">10초</option><option value="30">30초</option></select></div><button class="full" id="applyConfig">관찰 설정 적용</button><div class="eventlist" id="events">수집한 기록이 표시됩니다.</div></div></div></details></div><div class="panel control"><div style="display:flex;justify-content:space-between"><h2>조종</h2><span class="tiny" id="command">대기</span></div><div class="controlbody"><div class="dpad"><span></span><button aria-label="전진" data-cmd="전진" data-key="w">↑</button><span></span><button aria-label="좌측 이동" data-cmd="좌측 이동" data-key="a">←</button><button aria-label="이동 정지" class="stop" id="stop">■</button><button aria-label="우측 이동" data-cmd="우측 이동" data-key="d">→</button><button aria-label="좌회전" data-cmd="좌회전" data-key="q">↶</button><button aria-label="후진" data-cmd="후진" data-key="s">↓</button><button aria-label="우회전" data-cmd="우회전" data-key="e">↷</button></div><div class="controlinfo"><div class="range"><label for="speed">설정 속도</label><input id="speed" max="0.4" min="0.1" step="0.1" type="range" value="0.2"/><span id="speedValue">0.2 m/s</span></div><div class="pose"><button data-pose="StandUp">일어서기</button><button data-pose="StandDown">엎드리기</button><button class="stop" id="stop2">이동 정지</button></div></div></div></div><div class="composer"><span hidden="" id="sessionCount">0</span><span hidden="" id="includedCount">0</span><button class="full" id="finish">기록 보기</button></div></aside><section class="audioarea" id="speechSettings"><div class="audiotitle"><h2>수동 음성 기록</h2></div><div class="actions"><button class="primary" id="speechRecordSettings">녹음 시작</button><label for="speechModel">STT 모델</label><select id="speechModel"><option value="base">Base · 가벼움</option><option value="small" selected>Small · 기본</option><option value="medium">Medium · 느림</option></select><button id="speechApply">모델 적용</button></div><p class="note" id="speechStatus" role="status">녹음 대기</p><p class="note">녹음 시작 → 종료·저장 → STT 자동 변환 · 최대 10분</p></section><section class="panel verification"><div class="bar"><h2>관찰</h2></div><div class="verifybody"><div class="timerbox"><strong id="observationClock">00:00</strong><p id="timerStatus">수동</p><button id="timerStart">관찰</button><button id="timerReset">초기화</button></div><details class="compactdetail"><summary>관찰 입력</summary><div class="detailbody"><div><div class="fieldrow"><label>관찰 구역<input id="zone" maxlength="100" placeholder="예: 공학관 뒤편 계단"/></label><label>사용자 확인 자세<select id="observedPose"><option>미확인</option><option>누운 자세 후보</option><option>앉은 자세</option><option>서 있는 자세</option><option>가림으로 판단 불가</option></select></label></div><div class="fieldrow"><label>움직임 관찰<select id="observedMovement"><option>미확인</option><option>움직임 관찰됨</option><option>관찰 구간 내 뚜렷한 움직임 미관찰</option><option>가림·영상 불량으로 판단 불가</option></select></label><label>후속 확인 상태<select id="followup"><option>추가 확인 필요</option><option>관찰 진행 중</option><option>사용자 확인 완료</option></select></label></div><label>사용자가 직접 확인한 응답<input id="observedReply" maxlength="500" placeholder="예: ‘쉬고 있어요’라고 말함 / 발화자 불명확"/></label></div></div></details></div></section><details class="noteoptions"><summary>제목·태그</summary><div><input id="title" maxlength="100" placeholder="제목" type="text"/><input id="keywords" placeholder="태그" type="text"/></div></details><label class="modellabel" for="model">LLM 모델</label><input id="model" type="text" value="qwen3.5:4b"/><div class="actions"><label for="highlightScope">선정 범위</label><select id="highlightScope"><option value="all">전체 저장 기록</option><option value="current">현재 순찰</option></select><label for="highlightLimit">최대 개수</label><select id="highlightLimit"><option value="3">3개</option><option value="5" selected>5개</option><option value="8">8개</option></select></div><p class="note">관측 시각·발화 원문·사람 등장·자세 후보로 선정합니다.</p></div></dialog><dialog aria-labelledby="audioTitle" id="audioDialog"><div class="settingshead"><h2 id="audioTitle">오디오 재생</h2><button id="closeAudio">닫기</button></div><div class="audioarea"><p class="note">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p><div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div><div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div><p class="note" id="audioStatus" role="status">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p></div></dialog><script>
+/* buttons: flat, crisp */
+button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border:1px solid var(--line-strong);border-radius:var(--r-s);background:var(--solid);color:var(--text-2);font-weight:600;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+button:hover:not(:disabled){background:#f3f4f6;border-color:rgba(17,24,39,.32)}
+button:active:not(:disabled){background:#e5e7eb}
+button:disabled{opacity:.45;cursor:not-allowed}
+button svg{width:16px;height:16px;flex:none}
+.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+.primary:hover:not(:disabled){background:var(--navy-600);border-color:var(--navy-600)}
+.primary:active:not(:disabled){background:#0f1f38}
+.stop{color:var(--err);border-color:rgba(185,28,28,.35);background:#fff}
+.stop:hover:not(:disabled){background:#fef2f2;border-color:var(--err)}
+.primary.stop{background:var(--err);border-color:var(--err);color:#fff}
+.ghost{background:transparent;border-color:transparent}
+.ghost:hover:not(:disabled){background:rgba(17,24,39,.06);border-color:transparent}
+.icon{padding:7px}
+.full{width:100%}
+:is(button,input,select,textarea,a,summary):focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* fields */
+input[type=text],input[type=number],textarea,select{background:var(--solid);border:1px solid var(--line-strong);border-radius:var(--r-s);padding:8px 11px;min-width:0;transition:border-color .15s,box-shadow .15s}
+input[type=text]:focus,textarea:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(29,53,87,.12);outline:none}
+input[type=text],textarea{width:100%}
+textarea{resize:vertical;min-height:70px}
+input[type=range],input[type=checkbox]{accent-color:var(--navy)}
+label{font-size:13px;color:var(--text-2);font-weight:600}
+summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);list-style:none;display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary:before{content:"+";display:grid;place-items:center;width:16px;height:16px;border:1px solid var(--line-strong);border-radius:3px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--muted)}
+details[open]>summary:before{content:"−"}
+
+/* top bar: transparent at top, frosted when scrolled */
+.app{max-width:1320px;margin:auto;padding:0 24px 40px}
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:18px;padding:12px 24px;margin:0 -24px 4px;border-bottom:1px solid transparent;transition:background .25s,border-color .25s,backdrop-filter .25s}
+body.scrolled .topbar{background:rgba(243,245,248,.72);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom-color:var(--line)}
+.brandbox{display:flex;align-items:center;gap:11px}
+.logo{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--r-s);font:700 14px ui-monospace,Menlo,monospace;color:#fff;background:var(--navy)}
+.brand{font-weight:800;font-size:15px;letter-spacing:.08em}
+.brandbox .sub{font-size:12px}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* status bar: instrument-panel style */
+.statusbar{display:flex;margin-left:6px;border:1px solid var(--line-strong);border-radius:var(--r-s);background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);overflow:hidden}
+.cell{display:flex;align-items:center;gap:7px;padding:6px 12px;font-size:12.5px;color:var(--text-2);white-space:nowrap}
+.cell+.cell{border-left:1px solid var(--line)}
+.cell .k{font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--faint)}
+.led{width:7px;height:7px;border-radius:1px;background:var(--idle);flex:none}
+.cell[data-state=ok] .led{background:var(--ok)}
+.cell[data-state=busy] .led{background:var(--warn);animation:blink 1.4s steps(2,jump-none) infinite}
+.cell[data-state=err] .led{background:var(--err)}
+.cell[data-state=err]{color:var(--err)}
+.cell[data-state=rec] .led{background:var(--err);animation:blink 1s steps(2,jump-none) infinite}
+
+/* tabs: underline */
+.tabs{display:flex;gap:2px;margin:6px 0 16px;border-bottom:1px solid var(--line-strong)}
+.tabs button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:10px 14px;margin-bottom:-1px;border-bottom:2px solid transparent;font-size:14px}
+.tabs button:hover:not(:disabled){background:transparent;color:var(--text)}
+.tabs button.active{color:var(--text);border-bottom-color:var(--navy)}
+#count{display:inline-block;min-width:20px;padding:0 5px;border-radius:3px;background:rgba(17,24,39,.08);color:var(--text-2);font:600 11.5px/18px ui-monospace,Menlo,monospace;text-align:center}
+
+/* notice */
+.notice{padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.7;color:var(--muted);background:var(--glass);border:1px solid var(--line);margin-bottom:14px}
+.quiet-status{display:none}
+.quiet-status.error-visible{display:block;color:var(--err);background:rgba(254,242,242,.9);border-color:rgba(185,28,28,.3);border-left:3px solid var(--err)}
+
+/* cards: translucent panels */
+.card{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(17,24,39,.05);overflow:hidden}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.cardsub{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+.headactions{display:flex;gap:6px;align-items:center}
+.cardbody{padding:14px 16px}
+#live:not(.hidden),#archive:not(.hidden){animation:fadeIn .25s ease-out}
+.livegrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.side{display:grid;gap:14px}
+
+/* video + translucent overlays */
+.view{position:relative;aspect-ratio:16/9;background:#0b0f15;overflow:hidden}
+.view:fullscreen{aspect-ratio:auto}
+.cameraempty{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;pointer-events:none;color:#cbd5e1;
+ background:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px) 0 0/28px 28px,#0b0f15}
+.cameraempty strong{font-size:16px;font-weight:700;color:#e5e7eb;letter-spacing:.02em}
+.cameraempty p{margin:0;font-size:13px;color:#9ca3af}
+.cameraempty .ring{display:grid;place-items:center;width:44px;height:44px;border:1px solid rgba(156,163,175,.35);border-radius:var(--r-s);margin-bottom:4px}
+.cameraempty .ring svg{width:22px;height:22px;color:#9ca3af}
+.scan{position:absolute;left:0;right:0;height:1px;top:0;background:rgba(156,163,175,.35);box-shadow:0 0 12px rgba(156,163,175,.4);animation:scan 4s linear infinite}
+.ovl{position:absolute;background:rgba(9,12,17,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#f3f4f6;border:1px solid rgba(255,255,255,.12);border-radius:var(--r-s)}
+.livebadge{top:12px;left:12px;display:flex;align-items:center;gap:6px;padding:3px 8px;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.14em}
+.livebadge:before{content:"";width:7px;height:7px;border-radius:1px;background:#ef4444;animation:blink 1.2s steps(2,jump-none) infinite}
+.stamp{bottom:12px;left:12px;padding:3px 8px;font:12px ui-monospace,Menlo,monospace}
+.stamp:empty{display:none}
+.alertbanner{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:9px 14px;background:rgba(185,28,28,.86);backdrop-filter:blur(6px);color:#fff;font-weight:700;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.2)}
+.alertbanner svg{width:17px;height:17px}
+.alertbanner~.livebadge{top:52px}
+.videocard.alerting{border-color:rgba(185,28,28,.55);box-shadow:0 0 0 2px rgba(185,28,28,.25)}
+
+/* posture tags: square, left color rule */
+.posturelist{display:flex;flex-wrap:wrap;gap:6px;margin:0;min-height:34px;align-items:center}
+.pchip,.pline{display:inline-flex;align-items:center;padding:5px 10px;border-radius:var(--r-s);border:1px solid var(--line);border-left:3px solid var(--unk);background:var(--solid);font-size:13px;font-weight:700;color:var(--text-2)}
+.p-standing{border-left-color:var(--stand)}.p-sitting{border-left-color:var(--sit)}
+.p-lying{border-left-color:var(--lie);color:var(--err);background:#fef2f2}
+.p-wait,.p-none{font-weight:600;color:var(--muted)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--r-s);margin-top:12px;background:var(--sunken)}
+.metric{padding:9px 12px}
+.metric+.metric{border-left:1px solid var(--line)}
+.metric span{display:block;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
+.metric b{display:block;margin-top:2px;font-size:15px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:3px;margin-right:6px;vertical-align:middle}
+
+/* quick record */
+.recbar{display:flex;align-items:center;gap:8px}
+#recordingState{font-size:12.5px;color:var(--muted)}
+.quicknote{display:grid;gap:10px}
+.quicknote textarea{min-height:84px}
+
+/* highlights */
+.main-highlights{margin-top:14px}
+.progress{height:2px;background:rgba(29,53,87,.12);overflow:hidden}
+.progress span{display:block;height:100%;width:30%;background:var(--navy);animation:indet 1.2s ease-in-out infinite}
+#llmStatus{margin-top:0}
+#highlightCards>.note{display:inline-block;margin:0 6px 10px 0;padding:2px 8px;border-radius:3px;background:rgba(17,24,39,.06);font-size:12px;color:var(--text-2)}
+.highlight-card{margin:10px 0;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--glass-strong)}
+.highlight-head{display:flex;gap:14px;align-items:flex-start}
+.highlight-head img{width:168px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line)}
+.highlight-body{flex:1;min-width:0}
+.highlight-body>b{display:block;margin-top:10px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--faint)}
+.highlight-body>b:first-child{margin-top:0;font:700 15px/1.45 Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;letter-spacing:-.01em;color:var(--text)}
+.highlight-reason{margin:4px 0 0;padding:8px 12px;border-left:2px solid var(--navy);background:rgba(29,53,87,.05);font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+.highlight-card details{margin:10px 0}
+.highlight-card audio,.highlight-card video{width:100%;max-width:560px;display:block;margin-top:10px}
+.highlight-card>a{display:inline-block;margin:6px 14px 6px 0;font-size:13px}
+.evidence-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-2);font-size:13px;line-height:1.7}
+.highlight-card details b{display:block;margin-top:12px;font-size:12px}
+.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r);background:var(--sunken)}
+.actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.actions input{flex:1;min-width:80px}
+.summarydetails{margin-top:14px}
+#summaryHistory{display:grid;gap:4px;margin-top:10px}
+.source{justify-content:flex-start;width:100%;overflow-wrap:anywhere;font-weight:500;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+
+/* records */
+.searchAssist{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.searchAssist h3{display:none}
+.chips{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:var(--r-s);overflow:hidden}
+.chips button{border:0;border-radius:0;padding:7px 13px;font-size:13px;background:var(--solid)}
+.chips button+button{border-left:1px solid var(--line-strong)}
+.searchAssist .actions{margin:0}
+.searchAssist label{display:flex;gap:6px;align-items:center}
+#targetFilter{padding:2px 8px;border-radius:3px;background:var(--navy-50);color:var(--navy);font-size:12px;font-weight:600}
+.filters{padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);background:var(--sunken)}
+.filters input{flex:1;min-width:160px}
+.records{padding:4px 16px 16px}
+.record{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.record:last-child{border-bottom:0}
+.record img{width:156px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line);flex:none}
+.recordmain{flex:1;min-width:0}
+.recordmain>b{font-size:15px}
+.record p{margin:3px 0;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.record small{font-size:12px}
+.record details{margin-top:10px}
+.record input,.record textarea{margin-top:10px}
+.record audio{display:block;width:100%;max-width:520px;margin:10px 0}
+.record video{width:100%;max-width:520px;margin-top:10px}
+.record details>a{margin-right:10px;font-size:13px}
+.pline{margin:6px 6px 0 0!important;font-size:12.5px!important;font-weight:600}
+.pline.p-lying{color:var(--err)}
+.excluded{opacity:.55}
+.archivefoot{margin-top:14px}
+
+/* dialogs: frosted */
+dialog{border:1px solid rgba(255,255,255,.6);padding:0;border-radius:var(--r);width:min(940px,calc(100vw - 28px));max-height:88vh;overflow:auto;background:rgba(243,245,248,.86);backdrop-filter:saturate(1.3) blur(18px);-webkit-backdrop-filter:saturate(1.3) blur(18px);color:var(--text);box-shadow:0 24px 64px -24px rgba(17,24,39,.5)}
+dialog[open]{animation:fadeIn .18s ease-out}
+dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+.settingshead{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(248,250,252,.82);backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
+.settingshead h2{font-size:16px}
+.settingsgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 18px 20px}
+.settingsgrid .wide{grid-column:1/-1}
+.sect{background:var(--glass-strong);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.secttitle{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.secttitle .num{font:600 11.5px ui-monospace,Menlo,monospace;color:var(--faint)}
+.secttitle h2{font-size:14px}
+.secttitle .tiny{margin-left:auto}
+.field{display:grid;gap:6px;margin-bottom:12px}
+.fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fieldrow label,.field label{display:grid;gap:6px}
+.inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.switch{display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0}
+.range{display:flex;align-items:center;gap:10px;margin:10px 0;font-size:13px}
+.range input[type=range]{flex:1;min-width:90px}
+#speedValue,#confidenceValue{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.sample{font:12.5px/1.7 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-line;margin:10px 0;padding:8px 10px;border-radius:var(--r-s);background:var(--sunken);border:1px solid var(--line)}
+.eventlist{display:none}
+.kbd{display:inline-block;padding:0 5px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:3px;background:var(--solid);font:11.5px/18px ui-monospace,Menlo,monospace;color:var(--text-2)}
+.controlbody{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.dpad{display:grid;grid-template-columns:repeat(3,44px);gap:4px}
+.dpad button{padding:0;height:40px;font-size:17px;touch-action:none;user-select:none}
+.held{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}
+.controlinfo{flex:1;min-width:180px}
+.pose{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.timerbox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.timerbox strong{font:700 28px ui-monospace,Menlo,monospace;letter-spacing:.04em;color:var(--text)}
+#timerStatus{margin:0;padding:2px 8px;border-radius:3px;background:rgba(17,24,39,.06);font-size:12.5px;color:var(--text-2)}
+.compactdetail .detailbody{margin-top:12px}
+.audioupload,.audioplay{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap}
+.audioupload input{flex:1;min-width:180px;font-size:13px}
+.audioplay select{flex:1;min-width:160px}
+#audioDialog{width:min(620px,calc(100vw - 28px))}
+#audioDialog .audioarea{padding:16px 18px 20px}
+#connect{display:none}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:min(560px,90vw);background:rgba(17,24,39,.9);backdrop-filter:blur(8px);color:#f9fafb;padding:11px 16px;border-radius:var(--r);font-size:13px;font-weight:600;z-index:40;box-shadow:0 12px 32px -12px rgba(17,24,39,.6);animation:toastIn .2s ease-out}
+
+/* motion: short and quiet */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes blink{50%{opacity:.25}}
+@keyframes scan{from{top:0}to{top:100%}}
+@keyframes indet{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+
+/* responsive */
+@media(max-width:1180px){.cell .k{display:none}}
+@media(max-width:1020px){.statusbar .cell:nth-child(n+4){display:none}}
+@media(max-width:900px){.livegrid{grid-template-columns:1fr}.side{grid-template-columns:1fr 1fr}.statusbar{display:none}}
+@media(max-width:720px){.app{padding:0 14px 28px}.topbar{padding:10px 14px;margin:0 -14px 4px}.side{grid-template-columns:1fr}.settingsgrid{grid-template-columns:1fr}.fieldrow{grid-template-columns:1fr}.record{flex-wrap:wrap}.record img{width:100%}.highlight-head{flex-direction:column}.highlight-head img{width:100%}.brandbox .sub{display:none}.right button .lbl{display:none}}
+</style></head>
+<body><main class="app">
+<header class="topbar">
+ <div class="brandbox"><div class="logo">K9</div><div><div class="brand">K9 PATROL</div><div class="sub">사각지대 순찰 관제</div></div></div>
+ <div class="statusbar" aria-label="시스템 상태">
+  <span class="cell" id="chipRobot" data-state="off"><i class="led"></i><span class="k">ROBOT</span><span id="badge">미연결</span></span>
+  <span class="cell" id="chipVideo" data-state="off"><i class="led"></i><span class="k">VIDEO</span><span class="label">없음</span></span>
+  <span class="cell" id="chipDetect" data-state="off"><i class="led"></i><span class="k">POSE</span><span class="label">대기</span></span>
+  <span class="cell" id="chipLlm" data-state="off"><i class="led"></i><span class="k">LLM</span><span class="label">대기</span></span>
+  <span class="cell" id="chipRec" data-state="off"><i class="led"></i><span class="k">REC</span><span class="label">대기</span></span>
+ </div>
+ <div class="right">
+  <button id="openAudio" title="로봇 스피커로 음성 재생"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg><span class="lbl">오디오 재생</span></button>
+  <button id="openSettings" title="연결·조종·모델 설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">설정</span></button>
+ </div>
+</header>
+<nav class="tabs" aria-label="화면 전환"><button class="active" id="liveTab">관제</button><button id="recordsTab">기록 <span id="count">0</span></button><button id="speechMenu">음성</button></nav>
+<div class="notice quiet-status" id="notice">로컬 관제 · 실제 로봇 연결 전입니다. 미연결 기능은 결과를 생성하지 않습니다.</div>
+
+<section id="live">
+ <div class="livegrid">
+  <div class="card videocard" id="videoCard">
+   <div class="cardhead">
+    <div><h2>순찰 전방 영상</h2><p class="cardsub">Go2 전방 카메라 · 실시간 자세 추정</p></div>
+    <div class="headactions">
+     <button class="ghost icon" id="fullscreenBtn" title="전체 화면" aria-label="영상 전체 화면"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+     <button class="primary" id="capture"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>캡처</button>
+    </div>
+   </div>
+   <div class="view" id="viewBox">
+    <img alt="Go2 실시간 전방 영상" id="camera" style="width:100%;height:100%;object-fit:contain;visibility:hidden"/>
+    <div class="cameraempty" id="videoWaiting"><div class="scan"></div><div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7 16 12l7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div><strong>미연결</strong><p>설정에서 Go2를 연결하면 영상이 표시됩니다</p></div>
+    <div class="alertbanner hidden" id="lyingAlert" role="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>누워 있음 후보 감지 · 영상을 직접 확인하세요</div>
+    <div class="ovl livebadge hidden" id="liveBadge">LIVE</div>
+    <div class="ovl stamp" id="clock"></div>
+   </div>
+  </div>
+
+  <aside class="side">
+   <div class="card">
+    <div class="cardhead"><div><h2>현재 자세</h2><p class="cardsub">관절 규칙 기반 후보 · 확정 아님</p></div></div>
+    <div class="cardbody">
+     <p class="posturelist" id="postureLive" role="status">자세 추정 대기</p>
+     <div class="metrics">
+      <div class="metric"><span>탐지된 사람</span><b id="peopleCount">-</b></div>
+      <div class="metric"><span>로봇 제어 모드</span><b id="robotState">미연결</b></div>
+     </div>
+     <div class="legend"><span><i style="background:var(--stand)"></i>서 있음</span><span><i style="background:var(--sit)"></i>앉아 있음</span><span><i style="background:var(--lie)"></i>누워 있음</span><span><i style="background:var(--unk)"></i>판단 불가</span></div>
+    </div>
+   </div>
+
+   <div class="card">
+    <div class="cardhead"><h2>기록</h2><div class="recbar"><span id="recordingState" role="status">녹음 대기</span><button id="speechRecord">녹음 시작</button></div></div>
+    <div class="cardbody quicknote">
+     <textarea aria-label="관찰 기록" id="note" placeholder="관찰 내용을 짧게 기록하세요"></textarea>
+     <button class="primary full" id="save">현재 장면과 함께 저장</button>
+    </div>
+   </div>
+  </aside>
+ </div>
+
+ <section class="card main-highlights" id="report">
+  <div class="cardhead">
+   <div><h2>중요 기록·장면</h2><p class="cardsub">로컬 LLM이 저장 기록에서 먼저 확인할 장면을 고릅니다</p></div>
+   <button class="primary" id="generate">선정</button>
+  </div>
+  <div class="progress hidden" id="llmProgress"><span></span></div>
+  <div class="cardbody">
+   <p class="note" id="llmStatus" role="status">저장된 기록에서 확인할 장면을 선정하세요.</p>
+   <div id="highlightCards"><p class="empty">아직 선정 결과가 없습니다</p></div>
+   <div class="actions"><button id="reportDownload">선정 결과 다운로드</button></div>
+   <details class="summarydetails"><summary>이전 선정</summary><div id="summaryHistory"></div></details>
+  </div>
+ </section>
+</section>
+
+<section class="hidden" id="archive">
+ <div class="card">
+  <div class="cardhead"><div><h2>순찰 사건 기록</h2><p class="cardsub">자동·수동 기록과 음성 기록을 검토하고 메모합니다</p></div><button id="export">내보내기</button></div>
+  <div class="searchAssist">
+   <h3></h3>
+   <div class="chips"><button data-target="person">사람 관찰 장면</button><button data-target="speech">음성 기록</button><button data-target="">전체 대상</button></div>
+   <div class="actions"><label>현재 활동만 <input id="sessionOnly" type="checkbox"/></label><span class="sub" id="targetFilter">전체 대상</span></div>
+  </div>
+  <div class="filters">
+   <label for="filter">표시</label>
+   <select id="filter"><option value="all">전체 기록</option><option value="auto">자동 기록</option><option value="manual">수동 기록</option><option value="excluded">제외한 기록</option></select>
+   <input aria-label="기록 검색" id="search" placeholder="제목·키워드·메모·자세 검색" type="text"/>
+   <button id="reportTab">중요 장면 보기</button>
+  </div>
+  <div class="records" id="records"></div>
+ </div>
+ <div class="notice archivefoot">기록·영상은 실행 폴더의 data에 저장됩니다. 내보낸 JSON에는 영상 파일 자체가 포함되지 않습니다.</div>
+</section>
+</main>
+<div class="toast hidden" id="toast" role="status"></div>
+
+<dialog aria-labelledby="settingsTitle" id="settingsDialog">
+ <div class="settingshead"><h2 id="settingsTitle">설정</h2><button aria-label="설정 닫기" id="closeSettings">닫기</button></div>
+ <div class="settingsgrid" id="settingsContents">
+  <button id="connect">연결</button>
+
+  <section class="sect">
+   <div class="secttitle"><span class="num">01</span><h2>로봇 연결</h2></div>
+   <div class="field"><label for="robotIp">Go2 IP</label>
+    <div class="inline"><input id="robotIp" type="text" value="192.168.0.101" style="flex:1"/><button class="primary" id="connect2">연결</button><button id="disconnect">해제</button></div></div>
+   <p class="note" id="connectionState" role="status">미연결</p>
+  </section>
+
+  <section class="sect">
+   <div class="secttitle"><span class="num">02</span><h2>조종</h2><span class="tiny" id="command">대기</span></div>
+   <div class="controlbody">
+    <div class="dpad">
+     <span></span><button aria-label="전진" data-cmd="전진" data-key="w">↑</button><span></span>
+     <button aria-label="좌측 이동" data-cmd="좌측 이동" data-key="a">←</button><button aria-label="이동 정지" class="stop" id="stop">■</button><button aria-label="우측 이동" data-cmd="우측 이동" data-key="d">→</button>
+     <button aria-label="좌회전" data-cmd="좌회전" data-key="q">↶</button><button aria-label="후진" data-cmd="후진" data-key="s">↓</button><button aria-label="우회전" data-cmd="우회전" data-key="e">↷</button>
+    </div>
+    <div class="controlinfo">
+     <div class="range"><label for="speed">설정 속도</label><input id="speed" max="0.4" min="0.1" step="0.1" type="range" value="0.2"/><span id="speedValue">0.2 m/s</span></div>
+     <div class="pose"><button data-pose="StandUp">일어서기</button><button data-pose="StandDown">엎드리기</button><button class="stop" id="stop2">이동 정지</button></div>
+     <p class="note">키보드: <span class="kbd">Shift</span> + <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 이동, <span class="kbd">Q</span><span class="kbd">E</span> 회전, <span class="kbd">Space</span> 정지</p>
+    </div>
+   </div>
+  </section>
+
+  <section class="sect">
+   <div class="secttitle"><span class="num">03</span><h2>자세 추정·자동 저장</h2></div>
+   <div class="field"><label for="visionModel">비전 모델</label>
+    <select id="visionModel"><option value="yolo11n-pose.pt">자세 추정 · Nano</option><option value="yolo11s-pose.pt">자세 추정 · Small</option><option value="yolo11n.pt">사람 탐지 · Nano</option></select></div>
+   <label class="switch"><input checked="" name="target" type="checkbox" value="person"/>사람만 관찰</label>
+   <div class="range"><label for="confidence">탐지 점수 기준</label><input id="confidence" max="0.95" min="0.1" step="0.05" type="range" value="0.45"/><span id="confidenceValue">0.45</span></div>
+   <div class="sample" id="detectionStatus" role="status">탐지 모델 대기</div>
+   <label class="switch"><input checked="" id="autoCapture" type="checkbox"/> 사람 등장 시 전후 영상 저장</label>
+   <div class="range"><label for="cooldown">최소 저장 간격</label><select id="cooldown"><option value="5">5초</option><option selected="" value="10">10초</option><option value="30">30초</option></select></div>
+   <button class="full" id="applyConfig">관찰 설정 적용</button>
+   <div class="eventlist" id="events">수집한 기록이 표시됩니다.</div>
+   <p class="note">서 있음·앉아 있음·누워 있음 후보 표시 · 가림 시 판단 불가</p>
+  </section>
+
+  <section class="sect" id="speechSettings">
+   <div class="secttitle"><span class="num">04</span><h2>수동 음성 기록</h2></div>
+   <div class="inline"><button class="primary" id="speechRecordSettings">녹음 시작</button>
+    <label for="speechModel">STT 모델</label>
+    <select id="speechModel"><option value="base">Base · 가벼움</option><option value="small" selected>Small · 기본</option><option value="medium">Medium · 느림</option></select>
+    <button id="speechApply">모델 적용</button></div>
+   <p class="note" id="speechStatus" role="status">녹음 대기</p>
+   <p class="note">녹음 시작 → 종료·저장 → STT 자동 변환 · 최대 10분</p>
+  </section>
+
+  <section class="sect wide verification">
+   <div class="secttitle"><span class="num">05</span><h2>관찰</h2><span class="tiny">수동 관찰 타이머 · 15초 경과 표시</span></div>
+   <div class="timerbox"><strong id="observationClock">00:00</strong><p id="timerStatus">수동</p><button id="timerStart">관찰 시작</button><button id="timerReset">초기화</button></div>
+   <details class="compactdetail"><summary>관찰 입력</summary><div class="detailbody">
+    <div class="fieldrow">
+     <label>관찰 구역<input id="zone" maxlength="100" placeholder="예: 공학관 뒤편 계단" type="text"/></label>
+     <label>사용자 확인 자세<select id="observedPose"><option>미확인</option><option>누운 자세 후보</option><option>앉은 자세</option><option>서 있는 자세</option><option>가림으로 판단 불가</option></select></label>
+     <label>움직임 관찰<select id="observedMovement"><option>미확인</option><option>움직임 관찰됨</option><option>관찰 구간 내 뚜렷한 움직임 미관찰</option><option>가림·영상 불량으로 판단 불가</option></select></label>
+     <label>후속 확인 상태<select id="followup"><option>추가 확인 필요</option><option>관찰 진행 중</option><option>사용자 확인 완료</option></select></label>
+    </div>
+    <div class="field" style="margin-top:12px"><label>사용자가 직접 확인한 응답<input id="observedReply" maxlength="500" placeholder="예: ‘쉬고 있어요’라고 말함 / 발화자 불명확" type="text"/></label></div>
+   </div></details>
+  </section>
+
+  <section class="sect">
+   <div class="secttitle"><span class="num">06</span><h2>기록 옵션</h2></div>
+   <div class="field"><label for="title">제목</label><input id="title" maxlength="100" placeholder="제목" type="text"/></div>
+   <div class="field"><label for="keywords">태그</label><input id="keywords" placeholder="쉼표로 구분" type="text"/></div>
+  </section>
+
+  <section class="sect">
+   <div class="secttitle"><span class="num">07</span><h2>LLM 선정</h2></div>
+   <div class="field"><label for="model">LLM 모델</label><input id="model" type="text" value="qwen3.5:4b"/></div>
+   <div class="fieldrow">
+    <label for="highlightScope">선정 범위<select id="highlightScope"><option value="all">전체 저장 기록</option><option value="current">현재 순찰</option></select></label>
+    <label for="highlightLimit">최대 개수<select id="highlightLimit"><option value="3">3개</option><option value="5" selected>5개</option><option value="8">8개</option></select></label>
+   </div>
+   <p class="note">관측 시각·발화 원문·사람 등장·자세 후보로 선정합니다.</p>
+  </section>
+
+  <div class="wide composer"><span hidden="" id="sessionCount">0</span><span hidden="" id="includedCount">0</span><button class="full" id="finish">기록 보기</button></div>
+ </div>
+</dialog>
+
+<dialog aria-labelledby="audioTitle" id="audioDialog">
+ <div class="settingshead"><h2 id="audioTitle">오디오 재생</h2><button id="closeAudio">닫기</button></div>
+ <div class="audioarea">
+  <p class="note">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p>
+  <div class="sect">
+   <div class="secttitle"><span class="num">01</span><h2>파일 전송</h2></div>
+   <div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div>
+  </div>
+  <div class="sect" style="margin-top:12px">
+   <div class="secttitle"><span class="num">02</span><h2>재생</h2></div>
+   <div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div>
+  </div>
+  <p class="note" id="audioStatus" role="status">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p>
+ </div>
+</dialog>
+<script>
 const token='__TOKEN__',$=id=>document.getElementById(id),labels={speech:'음성',person:'사람',backpack:'배낭',handbag:'핸드백',suitcase:'여행가방'};let state=null,connected=false,pointer=null,held=new Set(),seq=Date.now()*1000,wasMoving=false,sendBusy=false,toastTimer,records=[],target='',reportResult='',lastRecords=0;
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),4000)}
 async function api(path,data){const r=await fetch('/api/'+path,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Control-Token':token},body:data===undefined?undefined:JSON.stringify(data),cache:'no-store'});const v=await r.json();if(!r.ok)throw Error(v.error||'요청 실패');return v}
@@ -41,7 +476,7 @@ function render(){
   const states={recording:'영상 저장 중',queued:'STT 대기',transcribing:'STT 변환 중',ready:'저장 완료',partial:'일부 저장',error:'처리 오류'};
   main.append(text('b',r.title),text('p',new Date(speech?m.started_at:r.time).toLocaleString('ko-KR')+' · '+(states[r.state]||r.state)));
   if(speech){main.append(text('p',m.transcript||'인식 문장 없음'),text('small','자동 STT · 발화자 미확인','muted'))}
-  else {main.append(text('p',r.targets.map(x=>labels[x]||x).join(', ')||'대상 정보 없음'));for(const [index,d] of (m.detections||[]).entries()){if(d.posture)main.append(text('p','#'+(index+1)+' '+d.posture.label+' · '+d.posture.reason))}}
+  else {main.append(text('p',r.targets.map(x=>labels[x]||x).join(', ')||'대상 정보 없음'));for(const [index,d] of (m.detections||[]).entries()){if(d.posture)main.append(text('p','#'+(index+1)+' '+d.posture.label+' · '+d.posture.reason,'pline p-'+d.posture.code))}}
   const details=document.createElement('details');details.append(text('summary',speech?'원본 음성·메모':'원본 영상·메모'));
   if(r.clip){
    if(speech||r.clip.endsWith('.mp4')){const v=document.createElement(speech?'audio':'video');v.controls=true;v.preload='none';v.src=media(r.clip);details.append(v)}
@@ -108,14 +543,16 @@ async function loadHistory(){try{
  h.forEach(r=>{const b=text('button',new Date(r.time).toLocaleString('ko-KR')+' · '+r.content.selected_count+'건','source');b.onclick=()=>showHighlights(r);$('summaryHistory').append(b)});
 }catch(e){toast(e.message)}}
 $('reportDownload').onclick=()=>{if(!highlightResult){toast('선정 결과가 없습니다.');return}download(new Blob([JSON.stringify(highlightResult,null,2)],{type:'application/json;charset=utf-8'}),'k9-important-records.json')};
-async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'● 연결 중':connected?'● 연결됨':'● 미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;$('events').replaceChildren();all.slice(0,3).forEach(x=>$('events').append(text('div',new Date(x.time).toLocaleTimeString('ko-KR')+' · '+x.title,'event')));if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
+async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;$('events').replaceChildren();all.slice(0,3).forEach(x=>$('events').append(text('div',new Date(x.time).toLocaleTimeString('ko-KR')+' · '+x.title,'event')));if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
 
 function refreshPosture(v){
- const e=$('postureLive');
- if(!v.video){e.textContent='영상 연결 대기';return}
- const people=v.detections.filter(d=>d.target==='person');
- e.textContent=people.length?people.map((d,i)=>'#'+(i+1)+' '+(d.posture?.label||'자세 모델 미사용')).join(' · '):'사람 미탐지';
- e.title=people.map((d,i)=>'#'+(i+1)+' '+(d.posture?.reason||'')).join(' / ');
+ const e=$('postureLive'),people=v.video?v.detections.filter(d=>d.target==='person'):[];
+ const lying=people.some(d=>d.posture?.code==='lying');
+ $('peopleCount').textContent=v.video?people.length+'명':'-';
+ $('lyingAlert').classList.toggle('hidden',!lying);$('videoCard').classList.toggle('alerting',lying);
+ const items=!v.video?[['영상 연결 대기','p-wait','']]:people.length?people.map((d,i)=>['#'+(i+1)+' '+(d.posture?.label||'자세 모델 미사용'),'p-'+(d.posture?.code||'none'),d.posture?.reason||'']):[['사람 미탐지','p-none','']];
+ const key=JSON.stringify(items);if(e.dataset.key===key)return;e.dataset.key=key;
+ e.replaceChildren(...items.map(([label,cls,reason])=>{const c=text('span',label,'pchip '+cls);if(reason)c.title=reason;return c}));
 }
 let speechSynced=false,lastSpeechSaved=null;
 function refreshSpeech(s){
@@ -167,4 +604,24 @@ $('openSettings').onclick=()=>{stop();$('settingsDialog').showModal()};
 $('closeSettings').onclick=()=>{stop();$('settingsDialog').close()};
 $('settingsDialog').addEventListener('cancel',stop);
 $('settingsDialog').addEventListener('close',stop);
+</script><script>
+/* 화면 상태 표시 (디자인 개선판): 기존 동작은 바꾸지 않고 state 값만 읽어 칩·진행 표시를 갱신 */
+(()=>{
+ const chip=(id,s,label)=>{const c=$(id);if(!c)return;c.dataset.state=s;const t=c.querySelector('.label');if(t&&label!==undefined)t.textContent=label};
+ function paint(){
+  const lost=$('badge').textContent.includes('끊김');
+  if(!state||lost){chip('chipRobot',lost?'err':'off');return}
+  const r=state.robot,v=state.vision,l=state.llm,sp=state.speech;
+  chip('chipRobot',r.connecting?'busy':r.connected?'ok':'off');
+  chip('chipVideo',v.video?'ok':'off',v.video?'수신':'없음');
+  chip('chipDetect',v.detector_error?'err':v.detecting?'ok':'off',v.detector_error?'오류':v.detecting?'추정 중':'대기');
+  chip('chipLlm',l.error?'err':l.busy?'busy':'off',l.error?'오류':l.busy?'선정 중 '+(l.elapsed_seconds||0)+'s':'대기');
+  chip('chipRec',sp?.recording?'rec':'off',sp?.recording?'녹음 중':'대기');
+  $('liveBadge').classList.toggle('hidden',!v.video);
+  $('llmProgress').classList.toggle('hidden',!l.busy);
+ }
+ setInterval(paint,500);paint();
+ const onScroll=()=>document.body.classList.toggle('scrolled',scrollY>4);addEventListener('scroll',onScroll,{passive:true});onScroll();
+ $('fullscreenBtn').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else $('viewBox').requestFullscreen?.()};
+})();
 </script></body></html>
