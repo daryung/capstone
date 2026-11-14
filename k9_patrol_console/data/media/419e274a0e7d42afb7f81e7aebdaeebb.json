@@ -1,0 +1,45 @@
+{
+  "event_kind": "speech",
+  "source": "robot_microphone",
+  "record_mode": "manual",
+  "started_at": "2026-11-14T02:22:36.446196+00:00",
+  "ended_at": "2026-11-14T02:22:49.559140+00:00",
+  "model": "small",
+  "duration_seconds": 11.84,
+  "stop_reason": "사용자 종료",
+  "transcript": "하얗고\n하얗고\n하얗고\n하얗고\n하얗고",
+  "segments": [
+    {
+      "start_seconds": 1.68,
+      "end_seconds": 3.68,
+      "text": "하얗고"
+    },
+    {
+      "start_seconds": 3.68,
+      "end_seconds": 5.68,
+      "text": "하얗고"
+    },
+    {
+      "start_seconds": 5.68,
+      "end_seconds": 7.68,
+      "text": "하얗고"
+    },
+    {
+      "start_seconds": 7.68,
+      "end_seconds": 9.68,
+      "text": "하얗고"
+    },
+    {
+      "start_seconds": 9.68,
+      "end_seconds": 11.68,
+      "text": "하얗고"
+    }
+  ],
+  "speaker": "미확인",
+  "position_status": "미수신",
+  "timestamp_basis": "PC reception estimate, not robot capture clock",
+  "snapshot_timing": "녹음 종료 시점",
+  "review_required": true,
+  "note": "수동 녹음의 자동 STT 결과. 원본 음성으로 확인하세요.",
+  "text_file": "419e274a0e7d42afb7f81e7aebdaeebb.txt"
+}

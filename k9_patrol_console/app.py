@@ -14,6 +14,7 @@ from vision import Vision
 from highlights import HighlightsService
 from ollama_connection import start_background
 from audio_control import AudioControl
+from microphone import Microphone, FRAME_BYTES
 from speech import SpeechRecorder
 from audio_files import save_audio
 
@@ -25,6 +26,7 @@ def serve(args):
     store=Store(args.data);vision=Vision(store);robot=Controller(vision);llm=HighlightsService(store)
     audio=AudioControl(robot);robot.audio=audio
     speech=SpeechRecorder(store,robot,vision);robot.speech=speech
+    mic=Microphone(robot);robot.microphone=mic
     audio_root=store.root/'audio'
     token=secrets.token_urlsafe(32);origin=f'http://127.0.0.1:{args.port}'
     class Handler(BaseHTTPRequestHandler):
@@ -42,6 +44,8 @@ def serve(args):
             if self.headers.get('Host')!=urlparse(origin).netloc:self.reply(403,{'error':'127.0.0.1 주소로 접속하세요.'});return
             if path=='/':
                 self.reply(200,(ROOT/'static/index.html').read_text().replace('__TOKEN__',token).encode(),'text/html; charset=utf-8');return
+            if path=='/microphone-worklet.js':
+                self.reply(200,(ROOT/'static/microphone-worklet.js').read_bytes(),'text/javascript; charset=utf-8');return
             if not self.authorized():self.reply(403,{'error':'인증되지 않은 로컬 요청'});return
             try:
                 if path=='/api/status':self.reply(200,dict(robot=robot.status(),vision=vision.status(),llm=llm.status(),audio=audio.status(),speech=speech.status()))
@@ -90,6 +94,14 @@ def serve(args):
             if not self.authorized() or self.headers.get('Origin')!=origin:self.reply(403,{'error':'동일 출처의 로컬 콘솔 요청만 허용됩니다.'});return
             try:
                 size=int(self.headers.get('Content-Length','0'))
+                if self.path=='/api/mic/pcm':
+                    if size not in (FRAME_BYTES, 2*FRAME_BYTES):raise ValueError('마이크 프레임 크기 오류')
+                    self.connection.settimeout(2)
+                    pcm=self.rfile.read(size)
+                    if len(pcm)!=size:raise ValueError('마이크 프레임 누락')
+                    self.reply(200,mic.call('pcm',pcm,self.headers.get('X-Mic-Session')));return
+                if mic.session and self.path in ('/api/audio/play','/api/audio/upload','/api/speech/start'):
+                    raise ValueError('마이크 방송을 먼저 종료하세요.')
                 if self.path=='/api/audio/upload':
                     if not 0<size<=8*1024*1024:raise ValueError('오디오 파일은 8MB 이하로 선택하세요.')
                     if not robot.status()['connected']:raise ValueError('로봇을 먼저 연결하세요.')
@@ -100,7 +112,9 @@ def serve(args):
                     self.reply(200,{'ok':True,'seconds':round(duration,2)});return
                 if not 0<size<=20000:raise ValueError('요청 크기 오류')
                 data=json.loads(self.rfile.read(size));out={'ok':True}
-                if self.path=='/api/speech/config':speech.configure(data)
+                if self.path=='/api/mic/start':out=mic.call('start')
+                elif self.path=='/api/mic/stop':out=mic.call('stop',session=data.get('session'))
+                elif self.path=='/api/speech/config':speech.configure(data)
                 elif self.path=='/api/speech/start':out=speech.start()
                 elif self.path=='/api/speech/stop':out=speech.stop()
                 elif self.path=='/api/audio/list':audio.start('list')

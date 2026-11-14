@@ -10,7 +10,7 @@ class Controller:
         self.lock=threading.Lock()
         self.info=dict(connected=False,connecting=False,mode='',error='',command='정지',ip='')
         self.vector=(0.,0.,0.);self.deadline=0.;self.sequence=-1
-        self.conn=None;self.commands=None;self.pose_busy=False;self.audio=None;self.speech=None
+        self.conn=None;self.commands=None;self.pose_busy=False;self.audio=None;self.speech=None;self.microphone=None
         self.loop=asyncio.new_event_loop()
         threading.Thread(target=self.run,daemon=True).start()
 
@@ -79,6 +79,7 @@ class Controller:
             await self._cleanup();self.update(connecting=False,connected=False,error=f'{type(exc).__name__}: {exc}')
 
     async def _cleanup(self):
+        if self.microphone:self.microphone.stop()
         if self.speech:await self.speech.detach()
         if self.audio:self.audio.cancel()
         self.stop();self.update(connected=False)

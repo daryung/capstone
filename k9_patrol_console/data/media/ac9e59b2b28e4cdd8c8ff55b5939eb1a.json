@@ -1,0 +1,25 @@
+{
+  "event_kind": "speech",
+  "source": "robot_microphone",
+  "record_mode": "manual",
+  "started_at": "2026-11-14T02:17:18.207316+00:00",
+  "ended_at": "2026-11-14T02:17:26.301507+00:00",
+  "model": "small",
+  "duration_seconds": 8.4,
+  "stop_reason": "사용자 종료",
+  "transcript": "살려주세요, 도와주세요, 살려주세요, 도와주세요",
+  "segments": [
+    {
+      "start_seconds": 2.13,
+      "end_seconds": 8.13,
+      "text": "살려주세요, 도와주세요, 살려주세요, 도와주세요"
+    }
+  ],
+  "speaker": "미확인",
+  "position_status": "미수신",
+  "timestamp_basis": "PC reception estimate, not robot capture clock",
+  "snapshot_timing": "녹음 종료 시점",
+  "review_required": true,
+  "note": "수동 녹음의 자동 STT 결과. 원본 음성으로 확인하세요.",
+  "text_file": "ac9e59b2b28e4cdd8c8ff55b5939eb1a.txt"
+}

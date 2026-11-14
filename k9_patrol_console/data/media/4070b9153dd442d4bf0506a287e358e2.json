@@ -1,0 +1,35 @@
+{
+  "event_kind": "speech",
+  "source": "robot_microphone",
+  "record_mode": "manual",
+  "started_at": "2026-11-14T02:21:54.811884+00:00",
+  "ended_at": "2026-11-14T02:22:01.770815+00:00",
+  "model": "small",
+  "duration_seconds": 7.28,
+  "stop_reason": "사용자 종료",
+  "transcript": "하이파이브\n하이파이브\n하이파이브",
+  "segments": [
+    {
+      "start_seconds": 1.3,
+      "end_seconds": 2.3,
+      "text": "하이파이브"
+    },
+    {
+      "start_seconds": 2.76,
+      "end_seconds": 3.76,
+      "text": "하이파이브"
+    },
+    {
+      "start_seconds": 4.36,
+      "end_seconds": 5.36,
+      "text": "하이파이브"
+    }
+  ],
+  "speaker": "미확인",
+  "position_status": "미수신",
+  "timestamp_basis": "PC reception estimate, not robot capture clock",
+  "snapshot_timing": "녹음 종료 시점",
+  "review_required": true,
+  "note": "수동 녹음의 자동 STT 결과. 원본 음성으로 확인하세요.",
+  "text_file": "4070b9153dd442d4bf0506a287e358e2.txt"
+}

@@ -17,35 +17,9 @@ def angle(a, b, c):
     return math.degrees(math.acos(max(-1.,min(1.,(u[0]*v[0]+u[1]*v[1])/length))))
 
 
-def lower_body(points, w, h, result, finish):
-    """Standing/sitting from hips and legs when the shoulders are not visible.
-    Same thresholds as the full-body rules, with the thigh in place of the torso.
-    Never returns lying: lying still needs the torso line.
-    """
-    legs=[]
-    for side,hip_i,knee_i,ankle_i in [('left',11,13,15),('right',12,14,16)]:
-        if all(i in points for i in (hip_i,knee_i,ankle_i)):
-            hi,kn,an=(points[i] for i in (hip_i,knee_i,ankle_i))
-            knee=angle(hi,kn,an)
-            if knee is None or math.dist(hi,an)<max(8,.08*max(w,h)):continue
-            # 0 = thigh vertical, 90 = thigh horizontal
-            thigh=math.degrees(math.atan2(abs(kn[0]-hi[0]),abs(kn[1]-hi[1])))
-            standing=(knee>=155 and thigh<=30 and kn[1]>hi[1] and an[1]-hi[1]>.6*math.dist(hi,an))
-            sitting=(55<=knee<=140 and thigh>=55 and an[1]>hi[1])
-            legs.append(dict(side=side,knee=round(knee,1),thigh_from_vertical=round(thigh,1),standing=standing,sitting=sitting))
-    result['metrics'].update(basis='lower_body',box_aspect=round(w/h,2),legs=legs)
-    if not legs:
-        return finish('unknown','어깨 관절 안 보임 · 무릎·발목 관절 부족')
-    if all(leg['standing'] for leg in legs):
-        return finish('standing','상체가 화면 밖 · 허벅지 수직, 다리 펴짐 (하체 기준)')
-    if all(leg['sitting'] for leg in legs):
-        return finish('sitting','상체가 화면 밖 · 허벅지 수평, 무릎 굽힘 (하체 기준)')
-    return finish('unknown','어깨 관절 안 보임 · 하체 조건 불충족')
-
-
 def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN):
     result=dict(code='unknown',label=LABELS['unknown'],reason='',metrics={},
-                method='coco17_rules_v2',keypoint_threshold=min_conf)
+                method='coco17_rules_v1',keypoint_threshold=min_conf)
     def finish(code, reason):
         result.update(code=code,label=LABELS[code],reason=reason)
         return result
@@ -65,12 +39,8 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN):
             if all(math.isfinite(v) for v in (x,y,c)) and c>=min_conf and not (x==0 and y==0):
                 points[i]=(x,y)
         except (TypeError,ValueError):pass
-    if not all(i in points for i in (11,12)):
-        return finish('unknown','양쪽 골반 관절 신뢰도 부족')
-    if not all(i in points for i in (5,6)):
-        # Go2 camera is ~30 cm above the floor: a nearby person's head and shoulders
-        # are often above the frame, or a desk hides the upper body.
-        return lower_body(points,w,h,result,finish)
+    if not all(i in points for i in (5,6,11,12)):
+        return finish('unknown','양쪽 어깨·골반 관절 신뢰도 부족')
     shoulder=tuple((points[5][i]+points[6][i])/2 for i in (0,1))
     hip=tuple((points[11][i]+points[12][i])/2 for i in (0,1))
     dx,dy=hip[0]-shoulder[0],hip[1]-shoulder[1]
@@ -82,7 +52,7 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN):
     span_x=max(p[0] for p in valid_body)-min(p[0] for p in valid_body)
     span_y=max(p[1] for p in valid_body)-min(p[1] for p in valid_body)
     aspect=span_x/max(span_y,1)
-    result['metrics'].update(basis='full_body',torso_tilt_degrees=round(tilt,1),box_aspect=round(w/h,2),body_aspect=round(aspect,2))
+    result['metrics'].update(torso_tilt_degrees=round(tilt,1),box_aspect=round(w/h,2),body_aspect=round(aspect,2))
     legs=[]
     for side,shoulder_i,hip_i,knee_i,ankle_i in [('left',5,11,13,15),('right',6,12,14,16)]:
         if all(i in points for i in (shoulder_i,hip_i,knee_i,ankle_i)):
@@ -115,8 +85,7 @@ def draw_postures(image, detections):
     import os
     fonts=[os.environ.get('K9_KOREAN_FONT',''),'/mnt/c/Windows/Fonts/malgun.ttf',
            'C:/Windows/Fonts/malgun.ttf','/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
-           '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
-           '/System/Library/Fonts/AppleSDGothicNeo.ttc']
+           '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc']
     font_path=next((f for f in fonts if f and Path(f).is_file()),None)
     labels=[(i,d) for i,d in enumerate(detections,1) if 'posture' in d]
     if not labels:return image

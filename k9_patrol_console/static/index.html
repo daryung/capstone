@@ -497,6 +497,7 @@ dialog::backdrop{background:rgba(10,15,25,.36);backdrop-filter:blur(2px)}
   <p class="note" style="margin:0">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p>
   <section class="sect"><h3>파일 전송</h3><div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div></section>
   <section class="sect"><h3>재생</h3><div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div></section>
+  <section class="sect"><h3>실시간 마이크 방송</h3><div><button id="micHold" type="button" style="touch-action:none;user-select:none">🎙 누르고 말하기</button> <span id="micStatus" role="status">대기</span></div></section>
   <p class="note" id="audioStatus" role="status" style="margin:0">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p>
  </div>
 </dialog>
@@ -598,7 +599,7 @@ async function loadHistory(){try{
  h.forEach(r=>{const b=text('button',new Date(r.time).toLocaleString('ko-KR')+' · '+r.content.selected_count+'건','source');b.onclick=()=>showHighlights(r);$('summaryHistory').append(b)});
 }catch(e){toast(e.message)}}
 $('reportDownload').onclick=()=>{if(!highlightResult){toast('선정 결과가 없습니다.');return}download(new Blob([JSON.stringify(highlightResult,null,2)],{type:'application/json;charset=utf-8'}),'k9-important-records.json')};
-async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;{const ev=all.slice(0,5),key=ev.map(x=>x.id+x.state).join();if($('events').dataset.key!==key){$('events').dataset.key=key;$('events').replaceChildren(...(ev.length?ev.map(x=>{const row=document.createElement('div');row.className='event '+(x.metadata?.event_kind==='speech'?'is-speech':'is-person');row.append(text('time',new Date(x.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),'event-t'),text('span',x.title,'event-title'));return row}):[text('p','이번 순찰에서 저장된 기록이 없습니다.','subject-empty')]))}}if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
+async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;if(!connected&&micBroadcast)endMic("Go2 연결 끊김");refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;{const ev=all.slice(0,5),key=ev.map(x=>x.id+x.state).join();if($('events').dataset.key!==key){$('events').dataset.key=key;$('events').replaceChildren(...(ev.length?ev.map(x=>{const row=document.createElement('div');row.className='event '+(x.metadata?.event_kind==='speech'?'is-speech':'is-person');row.append(text('time',new Date(x.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),'event-t'),text('span',x.title,'event-title'));return row}):[text('p','이번 순찰에서 저장된 기록이 없습니다.','subject-empty')]))}}if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
 
 function refreshPosture(v){
  const e=$('postureLive'),people=v.video?v.detections.filter(d=>d.target==='person'):[];
@@ -644,6 +645,64 @@ function observationNote(){const seconds=elapsedObservation();return '[사용자
 $('timerStart').onclick=()=>{if(!state?.vision.video){toast('최신 로봇 영상이 있을 때 수동 관찰을 시작하세요.');return}if(observationStarted!==null)return;stop();observationStarted=performance.now();$('timerStart').disabled=true;$('timerStatus').textContent='관찰 중';};
 $('timerReset').onclick=()=>{observationStarted=null;$('timerStart').disabled=false;$('observationClock').textContent='00:00';$('timerStatus').textContent='수동';};
 setInterval(()=>{if(observationStarted===null)return;if(!state?.vision.video){$('timerReset').click();toast('영상 미수신으로 수동 관찰 타이머를 초기화했습니다.');return}const sec=elapsedObservation();$('observationClock').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('timerStatus').textContent=sec>=15?'15초 경과':'관찰 중';},250);
+
+let micBroadcast=null;
+function endMic(status='대기'){
+ const job=micBroadcast;micBroadcast=null;
+ $('micStatus').textContent=status;
+ $('micHold').classList.remove('held');
+ if(!job)return;
+ job.abort.abort();
+ if(job.stream)job.stream.getTracks().forEach(t=>t.stop());
+ if(job.context)job.context.close().catch(()=>{});
+ if(job.session)api('mic/stop',{session:job.session}).catch(()=>{});
+}
+async function beginMic(){
+ if(micBroadcast)return;
+ if(!connected){$('micStatus').textContent='Go2를 먼저 연결하세요.';return}
+ if(!navigator.mediaDevices?.getUserMedia){$('micStatus').textContent='127.0.0.1 콘솔에서 마이크 권한을 확인하세요.';return}
+ stop();
+ const job={abort:new AbortController(),busy:false};micBroadcast=job;
+ $('micStatus').textContent='마이크 연결 중…';
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+  if(micBroadcast!==job){stream.getTracks().forEach(t=>t.stop());return}
+  job.stream=stream;
+  const ctx=job.context=new AudioContext({sampleRate:48000});
+  if(ctx.sampleRate!==48000)throw Error('브라우저에서 48 kHz 마이크를 열 수 없습니다.');
+  await ctx.resume();
+  await ctx.audioWorklet.addModule('/microphone-worklet.js');
+  if(micBroadcast!==job)return;
+  const {session}=await api('mic/start',{});
+  if(micBroadcast!==job){api('mic/stop',{session}).catch(()=>{});return}
+  job.session=session;
+  const node=new AudioWorkletNode(ctx,'go2-microphone',{numberOfOutputs:0});
+  job.node=node;
+  node.port.onmessage=async event=>{
+   if(micBroadcast!==job||job.busy)return;
+   job.busy=true;
+   try{
+    const r=await fetch('/api/mic/pcm',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Control-Token':token,'X-Mic-Session':session},body:event.data,signal:job.abort.signal});
+    if(!r.ok)throw Error((await r.json()).error||'마이크 방송 연결 오류');
+   }catch(e){if(micBroadcast===job)endMic(e.message)}
+   finally{job.busy=false}
+  };
+  stream.getAudioTracks()[0].addEventListener('ended',()=>{if(micBroadcast===job)endMic('마이크 연결 끊김')});
+  ctx.createMediaStreamSource(stream).connect(node);
+  $('micHold').classList.add('held');
+  $('micStatus').textContent='송출 중';
+ }catch(e){if(micBroadcast===job)endMic(e.name==='NotAllowedError'?'마이크 권한을 허용한 뒤 다시 눌러주세요.':e.message)}
+}
+const micButton=$('micHold');
+micButton.onpointerdown=e=>{if(e.button!==0||micBroadcast)return;e.preventDefault();micButton.setPointerCapture(e.pointerId);beginMic()};
+for(const type of ['pointerup','pointercancel','lostpointercapture'])micButton.addEventListener(type,()=>{if(micBroadcast)endMic()});
+micButton.onkeydown=e=>{if(['Space','Enter'].includes(e.code)){e.preventDefault();if(!e.repeat)beginMic()}};
+micButton.onkeyup=e=>{if(['Space','Enter'].includes(e.code)){e.preventDefault();if(micBroadcast)endMic()}};
+micButton.addEventListener('blur',()=>{if(micBroadcast)endMic()});
+window.addEventListener('blur',()=>{if(micBroadcast)endMic()});
+window.addEventListener('pagehide',()=>{if(micBroadcast)endMic()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&micBroadcast)endMic()});
+$('audioDialog').addEventListener('close',()=>{if(micBroadcast)endMic()});
 
 let audioUploading=false,audioListKey='';
 function refreshAudio(a){if(!a)return;const busy=!!a.busy||audioUploading;const linked=!!state?.robot.connected;$('audioUpload').disabled=!linked||busy||!$('audioFile').files.length;$('audioList').disabled=!linked||busy;$('audioPlay').disabled=!linked||busy||!!state?.speech.recording||!$('audioSelect').value;$('audioPause').disabled=!linked||busy;const key=JSON.stringify(a.items||[]);if(key!==audioListKey){audioListKey=key;const previous=$('audioSelect').value;$('audioSelect').replaceChildren();const empty=document.createElement('option');empty.value='';empty.textContent='재생할 음성을 선택하세요';$('audioSelect').append(empty);for(const item of a.items||[]){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('audioSelect').append(option)}if((a.items||[]).some(x=>x.id===previous))$('audioSelect').value=previous;else if(a.items?.length)$('audioSelect').value=a.items[a.items.length-1].id;} $('audioPlay').disabled=!linked||busy||!!state?.speech.recording||!$('audioSelect').value; $('audioStatus').textContent=audioUploading?'파일을 서버에 전송·변환하는 중…':a.error||a.message;}

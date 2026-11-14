@@ -1,0 +1,1460 @@
+From c306c3f7e67528c773c5a9c5d9d2770be5bb0220 Mon Sep 17 00:00:00 2001
+From: hs <gmltn0011223344@gmail.com>
+Date: Sat, 7 Nov 2026 23:42:22 +0900
+Subject: [PATCH 1/2] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94=20=ED=99=94?=
+ =?UTF-8?q?=EB=A9=B4=20=EB=94=94=EC=9E=90=EC=9D=B8=20=EA=B0=9C=EC=84=A0=20?=
+ =?UTF-8?q?=EC=8B=9C=EC=95=88=20(=EB=B0=9D=EC=9D=80=20=ED=85=8C=EB=A7=88)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 겹쳐 있던 스타일 4개를 하나로 정리, 밝은 테마·작은 모서리·반투명 패널
+- 상단 상태 표시줄: ROBOT/VIDEO/POSE/LLM/REC 상태를 한 줄로 표시
+- 현재 자세를 색 구분 태그로 표시, 누워 있음 후보가 있으면 영상 위 경고 표시
+- 기록 목록의 자세 후보 색 구분, LLM 선정 중 진행 막대, 영상 전체 화면 버튼
+- 설정 창을 연결·조종·자세·음성·관찰·기록·LLM 구역으로 정리
+- 기존 요소 ID와 서버 API, 동작 로직은 그대로 유지 (스크립트 수정은 표시 부분 3곳)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ k9_patrol_console/static/index.html | 493 +++++++++++++++++++++++++++-
+ 1 file changed, 475 insertions(+), 18 deletions(-)
+
+diff --git a/k9_patrol_console/static/index.html b/k9_patrol_console/static/index.html
+index c7ab241..996a4ff 100644
+--- a/k9_patrol_console/static/index.html
++++ b/k9_patrol_console/static/index.html
+@@ -1,16 +1,451 @@
+ <!DOCTYPE html>
++<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>K9 PATROL · 순찰 관제</title><style>
++:root{
++ --bg:#e9edf1;--glass:rgba(255,255,255,.74);--glass-strong:rgba(255,255,255,.9);--solid:#fff;--sunken:rgba(241,244,247,.8);
++ --line:rgba(17,24,39,.10);--line-strong:rgba(17,24,39,.18);
++ --text:#111827;--text-2:#1f2937;--muted:#4b5563;--faint:#6b7280;
++ --navy:#1d3557;--navy-600:#16294a;--navy-50:#e8edf5;
++ --ok:#15803d;--warn:#b45309;--err:#b91c1c;--idle:#9ca3af;
++ --stand:#15803d;--sit:#1d4ed8;--lie:#b91c1c;--unk:#6b7280;
++ --r:6px;--r-s:4px;--blur:saturate(1.3) blur(14px);
++}
++*{box-sizing:border-box}
++body{margin:0;min-height:100vh;color:var(--text);font:14px/1.6 Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Noto Sans KR",sans-serif;font-variant-numeric:tabular-nums;
++ background:linear-gradient(rgba(17,24,39,.035) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(17,24,39,.035) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(180deg,#f3f5f8,var(--bg) 420px);background-attachment:fixed}
++button,input,select,textarea{font:inherit;color:inherit}
++h2{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
++h3{font-size:15px;margin:8px 0}
++a{color:var(--navy);font-weight:600;text-underline-offset:3px}
++.hidden{display:none!important}
++.mono,.tiny{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
++.tiny{font-size:11.5px;color:var(--faint)}
++.sub,.muted{color:var(--muted)}
++.note{font-size:13px;line-height:1.7;margin:8px 0;color:var(--muted)}
++
++/* buttons: flat, crisp */
++button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border:1px solid var(--line-strong);border-radius:var(--r-s);background:var(--solid);color:var(--text-2);font-weight:600;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
++button:hover:not(:disabled){background:#f3f4f6;border-color:rgba(17,24,39,.32)}
++button:active:not(:disabled){background:#e5e7eb}
++button:disabled{opacity:.45;cursor:not-allowed}
++button svg{width:16px;height:16px;flex:none}
++.primary{background:var(--navy);border-color:var(--navy);color:#fff}
++.primary:hover:not(:disabled){background:var(--navy-600);border-color:var(--navy-600)}
++.primary:active:not(:disabled){background:#0f1f38}
++.stop{color:var(--err);border-color:rgba(185,28,28,.35);background:#fff}
++.stop:hover:not(:disabled){background:#fef2f2;border-color:var(--err)}
++.primary.stop{background:var(--err);border-color:var(--err);color:#fff}
++.ghost{background:transparent;border-color:transparent}
++.ghost:hover:not(:disabled){background:rgba(17,24,39,.06);border-color:transparent}
++.icon{padding:7px}
++.full{width:100%}
++:is(button,input,select,textarea,a,summary):focus-visible{outline:2px solid var(--navy);outline-offset:2px}
++
++/* fields */
++input[type=text],input[type=number],textarea,select{background:var(--solid);border:1px solid var(--line-strong);border-radius:var(--r-s);padding:8px 11px;min-width:0;transition:border-color .15s,box-shadow .15s}
++input[type=text]:focus,textarea:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(29,53,87,.12);outline:none}
++input[type=text],textarea{width:100%}
++textarea{resize:vertical;min-height:70px}
++input[type=range],input[type=checkbox]{accent-color:var(--navy)}
++label{font-size:13px;color:var(--text-2);font-weight:600}
++summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);list-style:none;display:flex;align-items:center;gap:8px}
++summary::-webkit-details-marker{display:none}
++summary:before{content:"+";display:grid;place-items:center;width:16px;height:16px;border:1px solid var(--line-strong);border-radius:3px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--muted)}
++details[open]>summary:before{content:"−"}
++
++/* top bar: transparent at top, frosted when scrolled */
++.app{max-width:1320px;margin:auto;padding:0 24px 40px}
++.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:18px;padding:12px 24px;margin:0 -24px 4px;border-bottom:1px solid transparent;transition:background .25s,border-color .25s,backdrop-filter .25s}
++body.scrolled .topbar{background:rgba(243,245,248,.72);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom-color:var(--line)}
++.brandbox{display:flex;align-items:center;gap:11px}
++.logo{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--r-s);font:700 14px ui-monospace,Menlo,monospace;color:#fff;background:var(--navy)}
++.brand{font-weight:800;font-size:15px;letter-spacing:.08em}
++.brandbox .sub{font-size:12px}
++.right{margin-left:auto;display:flex;gap:8px;align-items:center}
++
++/* status bar: instrument-panel style */
++.statusbar{display:flex;margin-left:6px;border:1px solid var(--line-strong);border-radius:var(--r-s);background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);overflow:hidden}
++.cell{display:flex;align-items:center;gap:7px;padding:6px 12px;font-size:12.5px;color:var(--text-2);white-space:nowrap}
++.cell+.cell{border-left:1px solid var(--line)}
++.cell .k{font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--faint)}
++.led{width:7px;height:7px;border-radius:1px;background:var(--idle);flex:none}
++.cell[data-state=ok] .led{background:var(--ok)}
++.cell[data-state=busy] .led{background:var(--warn);animation:blink 1.4s steps(2,jump-none) infinite}
++.cell[data-state=err] .led{background:var(--err)}
++.cell[data-state=err]{color:var(--err)}
++.cell[data-state=rec] .led{background:var(--err);animation:blink 1s steps(2,jump-none) infinite}
++
++/* tabs: underline */
++.tabs{display:flex;gap:2px;margin:6px 0 16px;border-bottom:1px solid var(--line-strong)}
++.tabs button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:10px 14px;margin-bottom:-1px;border-bottom:2px solid transparent;font-size:14px}
++.tabs button:hover:not(:disabled){background:transparent;color:var(--text)}
++.tabs button.active{color:var(--text);border-bottom-color:var(--navy)}
++#count{display:inline-block;min-width:20px;padding:0 5px;border-radius:3px;background:rgba(17,24,39,.08);color:var(--text-2);font:600 11.5px/18px ui-monospace,Menlo,monospace;text-align:center}
++
++/* notice */
++.notice{padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.7;color:var(--muted);background:var(--glass);border:1px solid var(--line);margin-bottom:14px}
++.quiet-status{display:none}
++.quiet-status.error-visible{display:block;color:var(--err);background:rgba(254,242,242,.9);border-color:rgba(185,28,28,.3);border-left:3px solid var(--err)}
++
++/* cards: translucent panels */
++.card{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(17,24,39,.05);overflow:hidden}
++.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
++.cardsub{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
++.headactions{display:flex;gap:6px;align-items:center}
++.cardbody{padding:14px 16px}
++#live:not(.hidden),#archive:not(.hidden){animation:fadeIn .25s ease-out}
++.livegrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
++.side{display:grid;gap:14px}
++
++/* video + translucent overlays */
++.view{position:relative;aspect-ratio:16/9;background:#0b0f15;overflow:hidden}
++.view:fullscreen{aspect-ratio:auto}
++.cameraempty{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;pointer-events:none;color:#cbd5e1;
++ background:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px) 0 0/28px 28px,#0b0f15}
++.cameraempty strong{font-size:16px;font-weight:700;color:#e5e7eb;letter-spacing:.02em}
++.cameraempty p{margin:0;font-size:13px;color:#9ca3af}
++.cameraempty .ring{display:grid;place-items:center;width:44px;height:44px;border:1px solid rgba(156,163,175,.35);border-radius:var(--r-s);margin-bottom:4px}
++.cameraempty .ring svg{width:22px;height:22px;color:#9ca3af}
++.scan{position:absolute;left:0;right:0;height:1px;top:0;background:rgba(156,163,175,.35);box-shadow:0 0 12px rgba(156,163,175,.4);animation:scan 4s linear infinite}
++.ovl{position:absolute;background:rgba(9,12,17,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#f3f4f6;border:1px solid rgba(255,255,255,.12);border-radius:var(--r-s)}
++.livebadge{top:12px;left:12px;display:flex;align-items:center;gap:6px;padding:3px 8px;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.14em}
++.livebadge:before{content:"";width:7px;height:7px;border-radius:1px;background:#ef4444;animation:blink 1.2s steps(2,jump-none) infinite}
++.stamp{bottom:12px;left:12px;padding:3px 8px;font:12px ui-monospace,Menlo,monospace}
++.stamp:empty{display:none}
++.alertbanner{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:9px 14px;background:rgba(185,28,28,.86);backdrop-filter:blur(6px);color:#fff;font-weight:700;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.2)}
++.alertbanner svg{width:17px;height:17px}
++.alertbanner~.livebadge{top:52px}
++.videocard.alerting{border-color:rgba(185,28,28,.55);box-shadow:0 0 0 2px rgba(185,28,28,.25)}
++
++/* posture tags: square, left color rule */
++.posturelist{display:flex;flex-wrap:wrap;gap:6px;margin:0;min-height:34px;align-items:center}
++.pchip,.pline{display:inline-flex;align-items:center;padding:5px 10px;border-radius:var(--r-s);border:1px solid var(--line);border-left:3px solid var(--unk);background:var(--solid);font-size:13px;font-weight:700;color:var(--text-2)}
++.p-standing{border-left-color:var(--stand)}.p-sitting{border-left-color:var(--sit)}
++.p-lying{border-left-color:var(--lie);color:var(--err);background:#fef2f2}
++.p-wait,.p-none{font-weight:600;color:var(--muted)}
++.metrics{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--r-s);margin-top:12px;background:var(--sunken)}
++.metric{padding:9px 12px}
++.metric+.metric{border-left:1px solid var(--line)}
++.metric span{display:block;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
++.metric b{display:block;margin-top:2px;font-size:15px}
++.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
++.legend i{display:inline-block;width:10px;height:3px;margin-right:6px;vertical-align:middle}
++
++/* quick record */
++.recbar{display:flex;align-items:center;gap:8px}
++#recordingState{font-size:12.5px;color:var(--muted)}
++.quicknote{display:grid;gap:10px}
++.quicknote textarea{min-height:84px}
++
++/* highlights */
++.main-highlights{margin-top:14px}
++.progress{height:2px;background:rgba(29,53,87,.12);overflow:hidden}
++.progress span{display:block;height:100%;width:30%;background:var(--navy);animation:indet 1.2s ease-in-out infinite}
++#llmStatus{margin-top:0}
++#highlightCards>.note{display:inline-block;margin:0 6px 10px 0;padding:2px 8px;border-radius:3px;background:rgba(17,24,39,.06);font-size:12px;color:var(--text-2)}
++.highlight-card{margin:10px 0;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--glass-strong)}
++.highlight-head{display:flex;gap:14px;align-items:flex-start}
++.highlight-head img{width:168px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line)}
++.highlight-body{flex:1;min-width:0}
++.highlight-body>b{display:block;margin-top:10px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--faint)}
++.highlight-body>b:first-child{margin-top:0;font:700 15px/1.45 Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;letter-spacing:-.01em;color:var(--text)}
++.highlight-reason{margin:4px 0 0;padding:8px 12px;border-left:2px solid var(--navy);background:rgba(29,53,87,.05);font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
++.highlight-card details{margin:10px 0}
++.highlight-card audio,.highlight-card video{width:100%;max-width:560px;display:block;margin-top:10px}
++.highlight-card>a{display:inline-block;margin:6px 14px 6px 0;font-size:13px}
++.evidence-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-2);font-size:13px;line-height:1.7}
++.highlight-card details b{display:block;margin-top:12px;font-size:12px}
++.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r);background:var(--sunken)}
++.actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
++.actions input{flex:1;min-width:80px}
++.summarydetails{margin-top:14px}
++#summaryHistory{display:grid;gap:4px;margin-top:10px}
++.source{justify-content:flex-start;width:100%;overflow-wrap:anywhere;font-weight:500;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
++
++/* records */
++.searchAssist{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
++.searchAssist h3{display:none}
++.chips{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:var(--r-s);overflow:hidden}
++.chips button{border:0;border-radius:0;padding:7px 13px;font-size:13px;background:var(--solid)}
++.chips button+button{border-left:1px solid var(--line-strong)}
++.searchAssist .actions{margin:0}
++.searchAssist label{display:flex;gap:6px;align-items:center}
++#targetFilter{padding:2px 8px;border-radius:3px;background:var(--navy-50);color:var(--navy);font-size:12px;font-weight:600}
++.filters{padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);background:var(--sunken)}
++.filters input{flex:1;min-width:160px}
++.records{padding:4px 16px 16px}
++.record{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
++.record:last-child{border-bottom:0}
++.record img{width:156px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line);flex:none}
++.recordmain{flex:1;min-width:0}
++.recordmain>b{font-size:15px}
++.record p{margin:3px 0;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
++.record small{font-size:12px}
++.record details{margin-top:10px}
++.record input,.record textarea{margin-top:10px}
++.record audio{display:block;width:100%;max-width:520px;margin:10px 0}
++.record video{width:100%;max-width:520px;margin-top:10px}
++.record details>a{margin-right:10px;font-size:13px}
++.pline{margin:6px 6px 0 0!important;font-size:12.5px!important;font-weight:600}
++.pline.p-lying{color:var(--err)}
++.excluded{opacity:.55}
++.archivefoot{margin-top:14px}
++
++/* dialogs: frosted */
++dialog{border:1px solid rgba(255,255,255,.6);padding:0;border-radius:var(--r);width:min(940px,calc(100vw - 28px));max-height:88vh;overflow:auto;background:rgba(243,245,248,.86);backdrop-filter:saturate(1.3) blur(18px);-webkit-backdrop-filter:saturate(1.3) blur(18px);color:var(--text);box-shadow:0 24px 64px -24px rgba(17,24,39,.5)}
++dialog[open]{animation:fadeIn .18s ease-out}
++dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
++.settingshead{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(248,250,252,.82);backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
++.settingshead h2{font-size:16px}
++.settingsgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 18px 20px}
++.settingsgrid .wide{grid-column:1/-1}
++.sect{background:var(--glass-strong);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
++.secttitle{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
++.secttitle .num{font:600 11.5px ui-monospace,Menlo,monospace;color:var(--faint)}
++.secttitle h2{font-size:14px}
++.secttitle .tiny{margin-left:auto}
++.field{display:grid;gap:6px;margin-bottom:12px}
++.fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
++.fieldrow label,.field label{display:grid;gap:6px}
++.inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
++.switch{display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0}
++.range{display:flex;align-items:center;gap:10px;margin:10px 0;font-size:13px}
++.range input[type=range]{flex:1;min-width:90px}
++#speedValue,#confidenceValue{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
++.sample{font:12.5px/1.7 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-line;margin:10px 0;padding:8px 10px;border-radius:var(--r-s);background:var(--sunken);border:1px solid var(--line)}
++.eventlist{display:none}
++.kbd{display:inline-block;padding:0 5px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:3px;background:var(--solid);font:11.5px/18px ui-monospace,Menlo,monospace;color:var(--text-2)}
++.controlbody{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
++.dpad{display:grid;grid-template-columns:repeat(3,44px);gap:4px}
++.dpad button{padding:0;height:40px;font-size:17px;touch-action:none;user-select:none}
++.held{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}
++.controlinfo{flex:1;min-width:180px}
++.pose{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
++.timerbox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
++.timerbox strong{font:700 28px ui-monospace,Menlo,monospace;letter-spacing:.04em;color:var(--text)}
++#timerStatus{margin:0;padding:2px 8px;border-radius:3px;background:rgba(17,24,39,.06);font-size:12.5px;color:var(--text-2)}
++.compactdetail .detailbody{margin-top:12px}
++.audioupload,.audioplay{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap}
++.audioupload input{flex:1;min-width:180px;font-size:13px}
++.audioplay select{flex:1;min-width:160px}
++#audioDialog{width:min(620px,calc(100vw - 28px))}
++#audioDialog .audioarea{padding:16px 18px 20px}
++#connect{display:none}
++
++/* toast */
++.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:min(560px,90vw);background:rgba(17,24,39,.9);backdrop-filter:blur(8px);color:#f9fafb;padding:11px 16px;border-radius:var(--r);font-size:13px;font-weight:600;z-index:40;box-shadow:0 12px 32px -12px rgba(17,24,39,.6);animation:toastIn .2s ease-out}
++
++/* motion: short and quiet */
++@keyframes fadeIn{from{opacity:0}to{opacity:1}}
++@keyframes blink{50%{opacity:.25}}
++@keyframes scan{from{top:0}to{top:100%}}
++@keyframes indet{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
++@keyframes toastIn{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
++@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
++
++/* responsive */
++@media(max-width:1180px){.cell .k{display:none}}
++@media(max-width:1020px){.statusbar .cell:nth-child(n+4){display:none}}
++@media(max-width:900px){.livegrid{grid-template-columns:1fr}.side{grid-template-columns:1fr 1fr}.statusbar{display:none}}
++@media(max-width:720px){.app{padding:0 14px 28px}.topbar{padding:10px 14px;margin:0 -14px 4px}.side{grid-template-columns:1fr}.settingsgrid{grid-template-columns:1fr}.fieldrow{grid-template-columns:1fr}.record{flex-wrap:wrap}.record img{width:100%}.highlight-head{flex-direction:column}.highlight-head img{width:100%}.brandbox .sub{display:none}.right button .lbl{display:none}}
++</style></head>
++<body><main class="app">
++<header class="topbar">
++ <div class="brandbox"><div class="logo">K9</div><div><div class="brand">K9 PATROL</div><div class="sub">사각지대 순찰 관제</div></div></div>
++ <div class="statusbar" aria-label="시스템 상태">
++  <span class="cell" id="chipRobot" data-state="off"><i class="led"></i><span class="k">ROBOT</span><span id="badge">미연결</span></span>
++  <span class="cell" id="chipVideo" data-state="off"><i class="led"></i><span class="k">VIDEO</span><span class="label">없음</span></span>
++  <span class="cell" id="chipDetect" data-state="off"><i class="led"></i><span class="k">POSE</span><span class="label">대기</span></span>
++  <span class="cell" id="chipLlm" data-state="off"><i class="led"></i><span class="k">LLM</span><span class="label">대기</span></span>
++  <span class="cell" id="chipRec" data-state="off"><i class="led"></i><span class="k">REC</span><span class="label">대기</span></span>
++ </div>
++ <div class="right">
++  <button id="openAudio" title="로봇 스피커로 음성 재생"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg><span class="lbl">오디오 재생</span></button>
++  <button id="openSettings" title="연결·조종·모델 설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">설정</span></button>
++ </div>
++</header>
++<nav class="tabs" aria-label="화면 전환"><button class="active" id="liveTab">관제</button><button id="recordsTab">기록 <span id="count">0</span></button><button id="speechMenu">음성</button></nav>
++<div class="notice quiet-status" id="notice">로컬 관제 · 실제 로봇 연결 전입니다. 미연결 기능은 결과를 생성하지 않습니다.</div>
++
++<section id="live">
++ <div class="livegrid">
++  <div class="card videocard" id="videoCard">
++   <div class="cardhead">
++    <div><h2>순찰 전방 영상</h2><p class="cardsub">Go2 전방 카메라 · 실시간 자세 추정</p></div>
++    <div class="headactions">
++     <button class="ghost icon" id="fullscreenBtn" title="전체 화면" aria-label="영상 전체 화면"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
++     <button class="primary" id="capture"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>캡처</button>
++    </div>
++   </div>
++   <div class="view" id="viewBox">
++    <img alt="Go2 실시간 전방 영상" id="camera" style="width:100%;height:100%;object-fit:contain;visibility:hidden"/>
++    <div class="cameraempty" id="videoWaiting"><div class="scan"></div><div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7 16 12l7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div><strong>미연결</strong><p>설정에서 Go2를 연결하면 영상이 표시됩니다</p></div>
++    <div class="alertbanner hidden" id="lyingAlert" role="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>누워 있음 후보 감지 · 영상을 직접 확인하세요</div>
++    <div class="ovl livebadge hidden" id="liveBadge">LIVE</div>
++    <div class="ovl stamp" id="clock"></div>
++   </div>
++  </div>
++
++  <aside class="side">
++   <div class="card">
++    <div class="cardhead"><div><h2>현재 자세</h2><p class="cardsub">관절 규칙 기반 후보 · 확정 아님</p></div></div>
++    <div class="cardbody">
++     <p class="posturelist" id="postureLive" role="status">자세 추정 대기</p>
++     <div class="metrics">
++      <div class="metric"><span>탐지된 사람</span><b id="peopleCount">-</b></div>
++      <div class="metric"><span>로봇 제어 모드</span><b id="robotState">미연결</b></div>
++     </div>
++     <div class="legend"><span><i style="background:var(--stand)"></i>서 있음</span><span><i style="background:var(--sit)"></i>앉아 있음</span><span><i style="background:var(--lie)"></i>누워 있음</span><span><i style="background:var(--unk)"></i>판단 불가</span></div>
++    </div>
++   </div>
++
++   <div class="card">
++    <div class="cardhead"><h2>기록</h2><div class="recbar"><span id="recordingState" role="status">녹음 대기</span><button id="speechRecord">녹음 시작</button></div></div>
++    <div class="cardbody quicknote">
++     <textarea aria-label="관찰 기록" id="note" placeholder="관찰 내용을 짧게 기록하세요"></textarea>
++     <button class="primary full" id="save">현재 장면과 함께 저장</button>
++    </div>
++   </div>
++  </aside>
++ </div>
++
++ <section class="card main-highlights" id="report">
++  <div class="cardhead">
++   <div><h2>중요 기록·장면</h2><p class="cardsub">로컬 LLM이 저장 기록에서 먼저 확인할 장면을 고릅니다</p></div>
++   <button class="primary" id="generate">선정</button>
++  </div>
++  <div class="progress hidden" id="llmProgress"><span></span></div>
++  <div class="cardbody">
++   <p class="note" id="llmStatus" role="status">저장된 기록에서 확인할 장면을 선정하세요.</p>
++   <div id="highlightCards"><p class="empty">아직 선정 결과가 없습니다</p></div>
++   <div class="actions"><button id="reportDownload">선정 결과 다운로드</button></div>
++   <details class="summarydetails"><summary>이전 선정</summary><div id="summaryHistory"></div></details>
++  </div>
++ </section>
++</section>
++
++<section class="hidden" id="archive">
++ <div class="card">
++  <div class="cardhead"><div><h2>순찰 사건 기록</h2><p class="cardsub">자동·수동 기록과 음성 기록을 검토하고 메모합니다</p></div><button id="export">내보내기</button></div>
++  <div class="searchAssist">
++   <h3></h3>
++   <div class="chips"><button data-target="person">사람 관찰 장면</button><button data-target="speech">음성 기록</button><button data-target="">전체 대상</button></div>
++   <div class="actions"><label>현재 활동만 <input id="sessionOnly" type="checkbox"/></label><span class="sub" id="targetFilter">전체 대상</span></div>
++  </div>
++  <div class="filters">
++   <label for="filter">표시</label>
++   <select id="filter"><option value="all">전체 기록</option><option value="auto">자동 기록</option><option value="manual">수동 기록</option><option value="excluded">제외한 기록</option></select>
++   <input aria-label="기록 검색" id="search" placeholder="제목·키워드·메모·자세 검색" type="text"/>
++   <button id="reportTab">중요 장면 보기</button>
++  </div>
++  <div class="records" id="records"></div>
++ </div>
++ <div class="notice archivefoot">기록·영상은 실행 폴더의 data에 저장됩니다. 내보낸 JSON에는 영상 파일 자체가 포함되지 않습니다.</div>
++</section>
++</main>
++<div class="toast hidden" id="toast" role="status"></div>
++
++<dialog aria-labelledby="settingsTitle" id="settingsDialog">
++ <div class="settingshead"><h2 id="settingsTitle">설정</h2><button aria-label="설정 닫기" id="closeSettings">닫기</button></div>
++ <div class="settingsgrid" id="settingsContents">
++  <button id="connect">연결</button>
++
++  <section class="sect">
++   <div class="secttitle"><span class="num">01</span><h2>로봇 연결</h2></div>
++   <div class="field"><label for="robotIp">Go2 IP</label>
++    <div class="inline"><input id="robotIp" type="text" value="192.168.0.101" style="flex:1"/><button class="primary" id="connect2">연결</button><button id="disconnect">해제</button></div></div>
++   <p class="note" id="connectionState" role="status">미연결</p>
++  </section>
++
++  <section class="sect">
++   <div class="secttitle"><span class="num">02</span><h2>조종</h2><span class="tiny" id="command">대기</span></div>
++   <div class="controlbody">
++    <div class="dpad">
++     <span></span><button aria-label="전진" data-cmd="전진" data-key="w">↑</button><span></span>
++     <button aria-label="좌측 이동" data-cmd="좌측 이동" data-key="a">←</button><button aria-label="이동 정지" class="stop" id="stop">■</button><button aria-label="우측 이동" data-cmd="우측 이동" data-key="d">→</button>
++     <button aria-label="좌회전" data-cmd="좌회전" data-key="q">↶</button><button aria-label="후진" data-cmd="후진" data-key="s">↓</button><button aria-label="우회전" data-cmd="우회전" data-key="e">↷</button>
++    </div>
++    <div class="controlinfo">
++     <div class="range"><label for="speed">설정 속도</label><input id="speed" max="0.4" min="0.1" step="0.1" type="range" value="0.2"/><span id="speedValue">0.2 m/s</span></div>
++     <div class="pose"><button data-pose="StandUp">일어서기</button><button data-pose="StandDown">엎드리기</button><button class="stop" id="stop2">이동 정지</button></div>
++     <p class="note">키보드: <span class="kbd">Shift</span> + <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 이동, <span class="kbd">Q</span><span class="kbd">E</span> 회전, <span class="kbd">Space</span> 정지</p>
++    </div>
++   </div>
++  </section>
++
++  <section class="sect">
++   <div class="secttitle"><span class="num">03</span><h2>자세 추정·자동 저장</h2></div>
++   <div class="field"><label for="visionModel">비전 모델</label>
++    <select id="visionModel"><option value="yolo11n-pose.pt">자세 추정 · Nano</option><option value="yolo11s-pose.pt">자세 추정 · Small</option><option value="yolo11n.pt">사람 탐지 · Nano</option></select></div>
++   <label class="switch"><input checked="" name="target" type="checkbox" value="person"/>사람만 관찰</label>
++   <div class="range"><label for="confidence">탐지 점수 기준</label><input id="confidence" max="0.95" min="0.1" step="0.05" type="range" value="0.45"/><span id="confidenceValue">0.45</span></div>
++   <div class="sample" id="detectionStatus" role="status">탐지 모델 대기</div>
++   <label class="switch"><input checked="" id="autoCapture" type="checkbox"/> 사람 등장 시 전후 영상 저장</label>
++   <div class="range"><label for="cooldown">최소 저장 간격</label><select id="cooldown"><option value="5">5초</option><option selected="" value="10">10초</option><option value="30">30초</option></select></div>
++   <button class="full" id="applyConfig">관찰 설정 적용</button>
++   <div class="eventlist" id="events">수집한 기록이 표시됩니다.</div>
++   <p class="note">서 있음·앉아 있음·누워 있음 후보 표시 · 가림 시 판단 불가</p>
++  </section>
++
++  <section class="sect" id="speechSettings">
++   <div class="secttitle"><span class="num">04</span><h2>수동 음성 기록</h2></div>
++   <div class="inline"><button class="primary" id="speechRecordSettings">녹음 시작</button>
++    <label for="speechModel">STT 모델</label>
++    <select id="speechModel"><option value="base">Base · 가벼움</option><option value="small" selected>Small · 기본</option><option value="medium">Medium · 느림</option></select>
++    <button id="speechApply">모델 적용</button></div>
++   <p class="note" id="speechStatus" role="status">녹음 대기</p>
++   <p class="note">녹음 시작 → 종료·저장 → STT 자동 변환 · 최대 10분</p>
++  </section>
++
++  <section class="sect wide verification">
++   <div class="secttitle"><span class="num">05</span><h2>관찰</h2><span class="tiny">수동 관찰 타이머 · 15초 경과 표시</span></div>
++   <div class="timerbox"><strong id="observationClock">00:00</strong><p id="timerStatus">수동</p><button id="timerStart">관찰 시작</button><button id="timerReset">초기화</button></div>
++   <details class="compactdetail"><summary>관찰 입력</summary><div class="detailbody">
++    <div class="fieldrow">
++     <label>관찰 구역<input id="zone" maxlength="100" placeholder="예: 공학관 뒤편 계단" type="text"/></label>
++     <label>사용자 확인 자세<select id="observedPose"><option>미확인</option><option>누운 자세 후보</option><option>앉은 자세</option><option>서 있는 자세</option><option>가림으로 판단 불가</option></select></label>
++     <label>움직임 관찰<select id="observedMovement"><option>미확인</option><option>움직임 관찰됨</option><option>관찰 구간 내 뚜렷한 움직임 미관찰</option><option>가림·영상 불량으로 판단 불가</option></select></label>
++     <label>후속 확인 상태<select id="followup"><option>추가 확인 필요</option><option>관찰 진행 중</option><option>사용자 확인 완료</option></select></label>
++    </div>
++    <div class="field" style="margin-top:12px"><label>사용자가 직접 확인한 응답<input id="observedReply" maxlength="500" placeholder="예: ‘쉬고 있어요’라고 말함 / 발화자 불명확" type="text"/></label></div>
++   </div></details>
++  </section>
++
++  <section class="sect">
++   <div class="secttitle"><span class="num">06</span><h2>기록 옵션</h2></div>
++   <div class="field"><label for="title">제목</label><input id="title" maxlength="100" placeholder="제목" type="text"/></div>
++   <div class="field"><label for="keywords">태그</label><input id="keywords" placeholder="쉼표로 구분" type="text"/></div>
++  </section>
++
++  <section class="sect">
++   <div class="secttitle"><span class="num">07</span><h2>LLM 선정</h2></div>
++   <div class="field"><label for="model">LLM 모델</label><input id="model" type="text" value="qwen3.5:4b"/></div>
++   <div class="fieldrow">
++    <label for="highlightScope">선정 범위<select id="highlightScope"><option value="all">전체 저장 기록</option><option value="current">현재 순찰</option></select></label>
++    <label for="highlightLimit">최대 개수<select id="highlightLimit"><option value="3">3개</option><option value="5" selected>5개</option><option value="8">8개</option></select></label>
++   </div>
++   <p class="note">관측 시각·발화 원문·사람 등장·자세 후보로 선정합니다.</p>
++  </section>
++
++  <div class="wide composer"><span hidden="" id="sessionCount">0</span><span hidden="" id="includedCount">0</span><button class="full" id="finish">기록 보기</button></div>
++ </div>
++</dialog>
+ 
+-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>K9 순찰</title><style>
+-:root{--bg:#101316;--panel:#181d22;--line:#30383f;--muted:#98a5af;--green:#a7d9c1}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#e8edef;font:14px system-ui,-apple-system,'Noto Sans KR',sans-serif}button,input,select,textarea{font:inherit}button{padding:9px 12px;border:1px solid #3e494f;border-radius:6px;background:#242c32;color:#e8edef;cursor:pointer}button:hover{border-color:var(--green)}button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--green);outline-offset:3px}.primary{background:var(--green);border-color:var(--green);color:#16251f}.stop{background:#462b2d;border-color:#78484d;color:#ffd3d3}.app{max-width:1480px;margin:auto;padding:22px 28px}header{display:flex;gap:12px;align-items:center;padding-bottom:18px;border-bottom:1px solid var(--line)}.logo{font:700 18px monospace;color:var(--green);border:1px solid #4e6b5e;padding:10px;border-radius:7px}.brand{font-weight:650;font-size:17px;letter-spacing:1px}.sub,.muted,.note,.tiny{color:var(--muted)}.sub{font-size:11px;line-height:1.6}.right{margin-left:auto;display:flex;gap:10px;align-items:center}.pill{font-size:12px;color:var(--green)}.heading{padding:16px 0}.heading nav{display:flex;gap:8px}nav button{background:transparent;border-color:transparent}nav button.active{background:#26372f;color:var(--green);border-color:#405c4e}.notice{padding:10px 14px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:11px;line-height:1.7;margin-bottom:16px}.grid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:18px;align-items:start}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}.bar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}h2{font-size:14px;font-weight:600;margin:0}h3{font-size:16px;margin:10px 0}.tiny{font:10px monospace}.view{height:410px;position:relative;background:#0b0f12}.cameraempty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;text-align:center;pointer-events:none}.cameraempty strong{font-size:16px;font-weight:500}.cameraempty p{font-size:12px;color:var(--muted);line-height:1.8}.stamp{position:absolute;bottom:12px;left:14px;color:var(--muted);font:11px monospace}.metrics{display:flex;padding:10px 18px;gap:18px;font-size:11px;color:var(--muted)}.metric{display:flex;gap:8px}.metric b{font-size:11px;font-weight:500}.metric:nth-child(n+2){display:none}.verification,.bottom{margin-top:18px}.manualbadge{font-size:10px;color:var(--muted)}.verifybody{display:grid;grid-template-columns:160px 1fr;gap:20px;padding:18px}.timerbox{padding:12px;border:1px solid var(--line);border-radius:6px}.timerbox strong{display:block;font:30px monospace;margin:12px 0}.timerbox p,.timerbox small{font-size:10px;line-height:1.6;color:var(--muted)}.timerbox button{display:block;width:100%;font-size:11px;padding:8px;margin:6px 0}.timerbox small{display:block}.fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:12px;color:var(--muted)}.verifybody label{display:block;margin-bottom:12px}.verifybody input,.verifybody select{margin-top:6px;width:100%}input[type=text],input[type=number],textarea,select{background:#11171c;color:#e8edef;border:1px solid #38444c;border-radius:6px;padding:10px;min-width:0}input[type=text],textarea{width:100%}textarea{height:80px;resize:vertical}.note{font-size:11px;line-height:1.8;margin:10px 0}.actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}.actions input{flex:1;min-width:80px}.full{width:100%}.aibody{padding:16px}.settings{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}summary{cursor:pointer;font-size:12px;color:var(--muted)}.feature{padding-top:12px}.tags{display:flex;gap:8px}.tags label,.switch{display:flex;align-items:center;gap:8px;font-size:11px;margin:10px 0}.range{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11px}.range input{width:105px;accent-color:var(--green)}input[type=checkbox]{accent-color:var(--green)}.sample{font-size:12px;line-height:1.8;color:var(--muted);white-space:pre-line;margin:12px 0}.eventlist{font-size:11px;line-height:1.8;color:var(--muted)}.event{padding:8px 0;border-top:1px solid var(--line)}.composer{padding:16px;border-top:1px solid var(--line)}.composer p{font-size:12px;color:var(--muted)}.control{margin:0;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;padding:16px}.controlbody{margin-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}.dpad{display:grid;grid-template-columns:repeat(3,42px);gap:5px}.dpad button{padding:0;height:37px;font-size:18px;touch-action:none;user-select:none}.held{background:var(--green);color:#15231d}.controlinfo{flex:1;min-width:130px}.controlinfo b{font-size:12px}.controlinfo p{font-size:11px;line-height:1.7;color:var(--muted)}.pose{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0}.pose button{font-size:10px;padding:8px}.audioarea{padding:18px;border-top:1px solid var(--line)}.audiotitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.audioupload,.audioplay{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}.audioupload input{flex:1;min-width:180px;font-size:12px}.audioplay select{flex:1;min-width:160px}.audioarea button{font-size:12px}.chips{display:flex;gap:7px;flex-wrap:wrap}.chips button{font-size:11px;padding:7px 10px}.searchAssist{padding:18px;border-bottom:1px solid var(--line)}.filters{padding:16px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.filters input{flex:1;min-width:150px}.records{padding:0 18px 18px}.record{display:flex;align-items:start;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}.record img{width:115px;max-height:90px;object-fit:cover;border-radius:5px}.recordmain{flex:1;min-width:0}.record p{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.record input,.record textarea{margin-top:10px}.record audio{display:block;width:100%;max-width:520px;margin:10px 0}.record video{width:100%;max-width:520px;margin-top:10px}.excluded{opacity:.6}.empty{padding:28px;text-align:center;color:var(--muted)}a{color:var(--green)}.source{display:block;margin:6px 0;padding:10px;overflow-wrap:anywhere}.hidden{display:none!important}.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:90vw;background:#c9e4d8;color:#172820;padding:12px 18px;border-radius:6px;font-size:12px;z-index:20}#llmStatus,#connectionState,#audioStatus{overflow-wrap:anywhere}#reportText{font-size:13px}.settingsbody .note{font-size:10px}
+-@media(max-width:1050px){.grid{grid-template-columns:minmax(0,1fr) 300px}.verifybody{grid-template-columns:1fr}.timerbox{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.timerbox strong{margin:0}.timerbox button{width:auto}.timerbox small{width:100%}}@media(max-width:780px){.grid{grid-template-columns:1fr}.view{height:330px}.app{padding:16px}.fieldrow{grid-template-columns:1fr}.right{gap:7px}header .sub{max-width:180px}#report .actions input{min-width:100px}.record{flex-wrap:wrap}}@media(max-width:420px){header{flex-wrap:wrap}.right{margin-left:0}.view{height:240px}.heading nav{gap:3px}nav button{font-size:12px;padding:9px}.audioplay button{padding:9px 10px}}
+-</style><style>
+-.app{max-width:1360px;padding:18px 24px}header{padding-bottom:12px}.heading{padding:10px 0}.brand{font-size:15px}.logo{padding:8px}.grid{grid-template-columns:minmax(0,1fr) 280px;gap:14px}.view{height:480px}.bar{padding:12px 14px}.aibody,.control{padding:14px}.verification,.bottom{margin-top:14px}.verifybody{padding:12px 14px;grid-template-columns:155px 1fr;gap:14px;align-items:start}.timerbox{border:0;padding:0}.timerbox strong{font-size:27px;margin:0 0 8px}.timerbox p{font-size:10px;margin:6px 0}.timerbox button{display:inline-block;width:auto;padding:7px 10px}.audioarea{padding:12px 14px}.audiotitle{margin-bottom:8px}.audiotitle .sub{display:none}.audioarea button{padding:8px 10px}.compactdetail summary,.bottom summary{padding:10px 0}.detailbody{padding-top:12px}.bottom{padding:0 14px}.bottom .detailbody>div{padding:0 0 14px!important;gap:8px!important}.settingsbody .sample{font-size:11px}.metrics{padding:8px 14px}.quiet-status{display:none}.quiet-status.error-visible{display:block;color:#f1b7b7}.composer{padding:12px 14px}.settings{margin-top:10px;padding-top:10px}.eventlist{display:none}.sample{padding:0;margin:10px 0}#audioStatus,#connectionState{font-size:10px;line-height:1.5}#audioStatus:empty{display:none}.controlbody{justify-content:center}.controlinfo{flex-basis:100%}.range{justify-content:center}.pose{justify-content:center}#report .bar h2{font-size:0}#report .bar h2:after{content:'LLM';font-size:14px}.fieldrow{grid-template-columns:1fr}.verifybody label{font-size:11px}button{font-size:12px}.notice{font-size:10px}header .sub:empty{display:none}.audioarea input[type=file]{font-size:11px}.timerbox strong{display:inline-block}.audioupload{margin-top:0}.audioarea select{font-size:12px}#capture{padding:6px 12px}.manualbadge{display:none}@media(max-width:850px){.grid{grid-template-columns:1fr}.view{height:350px}.controlbody{justify-content:start}.controlinfo{flex-basis:auto}.range,.pose{justify-content:start}}@media(max-width:520px){.app{padding:12px}.view{height:260px}.verifybody{grid-template-columns:1fr}.right{margin-left:auto}header{flex-wrap:nowrap}.brand{font-size:13px}.right button{padding:8px}.pill{font-size:10px}}
+-</style><style>
+-.app{max-width:1100px;padding:18px 24px}.heading{padding:10px 0}.heading nav{gap:6px}.grid{display:block}.view{height:500px}.metrics{display:none}.bottom{margin-top:12px;padding:0}.quicknote{padding:12px 14px;display:flex;align-items:stretch;gap:10px}.quicknote textarea{height:68px;flex:1}.quickactions{display:flex;align-items:center}.main-highlights{margin-top:12px}.main-highlights>.bar h2{font-size:14px!important}.main-highlights>.bar h2:after{content:none!important}.main-highlights>div:not(.bar){padding:14px!important}.summaryactions{display:flex;justify-content:flex-end}.main-highlights #llmStatus{font-size:11px}.main-highlights #reportText{height:180px!important}.summarydetails{margin-top:12px}.main-highlights #reportSources,.main-highlights #summaryHistory{font-size:12px}.main-highlights #reportDownload{font-size:11px}.main-highlights #reportText{margin-top:4px!important}.noteoptions{padding:14px}.noteoptions input{margin-top:8px}.settingshead{display:flex;justify-content:space-between;align-items:center;padding:0 0 16px;border-bottom:1px solid var(--line)}dialog{background:var(--panel);color:#e8edef;border:1px solid var(--line);border-radius:10px;width:min(720px,calc(100vw - 28px));max-height:88vh;overflow-y:auto;padding:20px}dialog::backdrop{background:#000a}#settingsContents>.ai{border:0;border-radius:0}#settingsContents>.ai>.bar{display:none}#settingsContents .aibody{padding:14px 0}#settingsContents .control{padding:14px 0}#settingsContents .controlbody{justify-content:start}#settingsContents .controlinfo{flex-basis:auto}#settingsContents .range,#settingsContents .pose{justify-content:start}#settingsContents>.audioarea{padding:16px 0}#settingsContents .verification{border:0;border-top:1px solid var(--line);border-radius:0}#settingsContents .verification .bar{padding:14px 0}#settingsContents .verifybody{padding:14px 0}#settingsContents .composer{display:none}#settingsContents>#connect{display:none}.modellabel{display:block;padding:14px 0 8px}#settingsContents>#model{width:100%}#settingsDialog .settingsbody{max-width:100%}.right{margin-left:auto}.brand{font-size:14px}#liveTab,#recordsTab{font-size:12px}.cameraempty p{display:none}@media(max-width:650px){.app{padding:12px}.view{height:300px}.quicknote{padding:10px}.main-highlights>div:not(.bar){padding:12px!important}header .sub{display:none}.right{gap:6px}.right button{padding:8px;font-size:11px}}@media(max-width:420px){.view{height:230px}.brand{font-size:12px}.logo{padding:6px}.pill{font-size:9px}}
+-</style><style>
+-#report>.bar h2{font-size:14px!important}#report>.bar h2:after{content:none!important}
+-.highlight-card{padding:16px 0;border-top:1px solid var(--line)}.highlight-head{display:flex;gap:14px;align-items:flex-start}.highlight-head img{width:140px;max-height:120px;object-fit:cover;border-radius:6px}.highlight-body{flex:1;min-width:0}.highlight-reason{font-size:13px;line-height:1.8;white-space:pre-wrap;margin:6px 0;overflow-wrap:anywhere}.highlight-card details{margin:10px 0}.highlight-card audio,.highlight-card video{width:100%;max-width:560px;display:block;margin-top:10px}.highlight-card>a{display:inline-block;margin:6px 12px 6px 0;font-size:12px}.highlight-card>button{font-size:11px}.evidence-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);font-size:12px;line-height:1.7}.highlight-card details b{display:block;margin-top:12px;font-size:12px}@media(max-width:540px){.highlight-head{flex-direction:column}.highlight-head img{width:100%;max-height:180px}.highlight-card{padding:12px 0}}
+-</style></head><body><main class="app"><header><div class="logo">K9</div><div><div class="brand">K9 PATROL</div><div class="sub"></div></div><div class="right"><span class="pill" id="badge">● 미연결</span><button id="openAudio">오디오 재생</button><button id="openSettings">설정</button></div></header><div class="heading"><nav><button class="active" id="liveTab">관제</button><button id="recordsTab">기록<span id="count" style="margin-left:6px">0</span></button><button id="speechMenu">음성</button></nav></div><div class="notice quiet-status" id="notice">로컬 관제 · 실제 로봇 연결 전입니다. 미연결 기능은 결과를 생성하지 않습니다.</div><section id="live"><div class="grid"><div class="panel"><div class="bar"><h2>순찰 전방 영상</h2><button class="primary full" id="capture" style="margin-top:10px">캡처</button></div><div class="view"><img alt="Go2 실시간 전방 영상" id="camera" style="width:100%;height:100%;object-fit:contain;visibility:hidden"/><div class="cameraempty" id="videoWaiting"><strong>미연결</strong></div><div class="stamp" id="clock"></div></div><p class="note" id="postureLive" role="status" style="padding:0 14px">자세 추정 대기</p><div class="metrics"><div class="metric"><span class="tiny">로봇 제어 모드</span><b id="robotState">미연결</b></div></div></div></div><div class="panel bottom"><div class="bar"><h2>기록</h2><div class="actions" style="margin:0"><span class="note" id="recordingState" role="status">녹음 대기</span><button id="speechRecord">녹음 시작</button></div></div><div class="quicknote"><textarea aria-label="관찰 기록" id="note" placeholder="짧게 기록하세요"></textarea><div class="quickactions"><button class="primary" id="save">저장</button></div></div></div><section class="panel main-highlights" id="report"><div class="bar"><h2>중요 기록·장면</h2><button class="primary" id="generate">선정</button></div><div style="padding:14px"><p class="note" id="llmStatus" role="status">저장된 기록에서 확인할 장면을 선정하세요.</p><div id="highlightCards"><p class="empty">선정 전</p></div><div class="actions"><button id="reportDownload">선정 결과 다운로드</button></div><details class="summarydetails"><summary>이전 선정</summary><div id="summaryHistory"></div></details></div></section></section><section class="hidden" id="archive"><div class="panel"><div class="bar"><h2>순찰 사건 기록</h2><button id="export">내보내기</button></div><div class="searchAssist"><h3></h3><div class="chips"><button data-target="person">사람 관찰 장면</button><button data-target="speech">음성 기록</button><button data-target="">전체 대상</button></div><div class="actions"><label>현재 활동만 <input id="sessionOnly" type="checkbox"/></label><span class="sub" id="targetFilter">전체 대상</span></div></div><div class="filters"><label for="filter">표시</label><select id="filter"><option value="all">전체 기록</option><option value="auto">자동 기록</option><option value="manual">수동 기록</option><option value="excluded">제외한 기록</option></select><input aria-label="기록 검색" id="search" placeholder="제목·키워드·메모 검색" type="text"/><button id="reportTab">중요 장면</button></div><div class="records" id="records"></div></div><div class="notice" style="margin-top:16px">기록·영상은 실행 폴더의 data에 저장됩니다. 내보낸 JSON에는 영상 파일 자체가 포함되지 않습니다.</div></section></main><div class="toast hidden" id="toast" role="status"></div><dialog aria-labelledby="settingsTitle" id="settingsDialog"><div class="settingshead"><h2 id="settingsTitle">설정</h2><button aria-label="설정 닫기" id="closeSettings">닫기</button></div><div id="settingsContents"><button id="connect">연결</button><aside class="panel ai"><div class="bar"><h2>연결</h2><span class="tiny"></span></div><div class="aibody"><label for="robotIp">Go2 IP</label><div class="actions"><input id="robotIp" type="text" value="192.168.0.101"/><button class="primary" id="connect2">연결</button><button id="disconnect">해제</button></div><p class="note" id="connectionState" role="status">미연결</p><details class="settings"><summary>자세 추정·자동 저장</summary><div class="settingsbody"><div class="feature"><label for="visionModel">비전 모델</label><select id="visionModel"><option value="yolo11n-pose.pt">자세 추정 · Nano</option><option value="yolo11s-pose.pt">자세 추정 · Small</option><option value="yolo11n.pt">사람 탐지 · Nano</option></select><p class="note">서 있음·앉아 있음·누워 있음 후보 표시 · 가림 시 판단 불가</p><div class="tags"><label><input checked="" name="target" type="checkbox" value="person"/>사람만 관찰</label></div><label for="confidence">탐지 점수 기준</label><input id="confidence" max="0.95" min="0.1" step="0.05" type="range" value="0.45"/><span id="confidenceValue">0.45</span><div class="sample" id="detectionStatus" role="status">탐지 모델 대기</div></div><div class="feature"><label class="switch"><input checked="" id="autoCapture" type="checkbox"/> 사람 등장 시 전후 영상 저장</label><div class="range"><label for="cooldown">최소 저장 간격</label><select id="cooldown"><option value="5">5초</option><option selected="" value="10">10초</option><option value="30">30초</option></select></div><button class="full" id="applyConfig">관찰 설정 적용</button><div class="eventlist" id="events">수집한 기록이 표시됩니다.</div></div></div></details></div><div class="panel control"><div style="display:flex;justify-content:space-between"><h2>조종</h2><span class="tiny" id="command">대기</span></div><div class="controlbody"><div class="dpad"><span></span><button aria-label="전진" data-cmd="전진" data-key="w">↑</button><span></span><button aria-label="좌측 이동" data-cmd="좌측 이동" data-key="a">←</button><button aria-label="이동 정지" class="stop" id="stop">■</button><button aria-label="우측 이동" data-cmd="우측 이동" data-key="d">→</button><button aria-label="좌회전" data-cmd="좌회전" data-key="q">↶</button><button aria-label="후진" data-cmd="후진" data-key="s">↓</button><button aria-label="우회전" data-cmd="우회전" data-key="e">↷</button></div><div class="controlinfo"><div class="range"><label for="speed">설정 속도</label><input id="speed" max="0.4" min="0.1" step="0.1" type="range" value="0.2"/><span id="speedValue">0.2 m/s</span></div><div class="pose"><button data-pose="StandUp">일어서기</button><button data-pose="StandDown">엎드리기</button><button class="stop" id="stop2">이동 정지</button></div></div></div></div><div class="composer"><span hidden="" id="sessionCount">0</span><span hidden="" id="includedCount">0</span><button class="full" id="finish">기록 보기</button></div></aside><section class="audioarea" id="speechSettings"><div class="audiotitle"><h2>수동 음성 기록</h2></div><div class="actions"><button class="primary" id="speechRecordSettings">녹음 시작</button><label for="speechModel">STT 모델</label><select id="speechModel"><option value="base">Base · 가벼움</option><option value="small" selected>Small · 기본</option><option value="medium">Medium · 느림</option></select><button id="speechApply">모델 적용</button></div><p class="note" id="speechStatus" role="status">녹음 대기</p><p class="note">녹음 시작 → 종료·저장 → STT 자동 변환 · 최대 10분</p></section><section class="panel verification"><div class="bar"><h2>관찰</h2></div><div class="verifybody"><div class="timerbox"><strong id="observationClock">00:00</strong><p id="timerStatus">수동</p><button id="timerStart">관찰</button><button id="timerReset">초기화</button></div><details class="compactdetail"><summary>관찰 입력</summary><div class="detailbody"><div><div class="fieldrow"><label>관찰 구역<input id="zone" maxlength="100" placeholder="예: 공학관 뒤편 계단"/></label><label>사용자 확인 자세<select id="observedPose"><option>미확인</option><option>누운 자세 후보</option><option>앉은 자세</option><option>서 있는 자세</option><option>가림으로 판단 불가</option></select></label></div><div class="fieldrow"><label>움직임 관찰<select id="observedMovement"><option>미확인</option><option>움직임 관찰됨</option><option>관찰 구간 내 뚜렷한 움직임 미관찰</option><option>가림·영상 불량으로 판단 불가</option></select></label><label>후속 확인 상태<select id="followup"><option>추가 확인 필요</option><option>관찰 진행 중</option><option>사용자 확인 완료</option></select></label></div><label>사용자가 직접 확인한 응답<input id="observedReply" maxlength="500" placeholder="예: ‘쉬고 있어요’라고 말함 / 발화자 불명확"/></label></div></div></details></div></section><details class="noteoptions"><summary>제목·태그</summary><div><input id="title" maxlength="100" placeholder="제목" type="text"/><input id="keywords" placeholder="태그" type="text"/></div></details><label class="modellabel" for="model">LLM 모델</label><input id="model" type="text" value="qwen3.5:4b"/><div class="actions"><label for="highlightScope">선정 범위</label><select id="highlightScope"><option value="all">전체 저장 기록</option><option value="current">현재 순찰</option></select><label for="highlightLimit">최대 개수</label><select id="highlightLimit"><option value="3">3개</option><option value="5" selected>5개</option><option value="8">8개</option></select></div><p class="note">관측 시각·발화 원문·사람 등장·자세 후보로 선정합니다.</p></div></dialog><dialog aria-labelledby="audioTitle" id="audioDialog"><div class="settingshead"><h2 id="audioTitle">오디오 재생</h2><button id="closeAudio">닫기</button></div><div class="audioarea"><p class="note">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p><div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div><div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div><p class="note" id="audioStatus" role="status">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p></div></dialog><script>
++<dialog aria-labelledby="audioTitle" id="audioDialog">
++ <div class="settingshead"><h2 id="audioTitle">오디오 재생</h2><button id="closeAudio">닫기</button></div>
++ <div class="audioarea">
++  <p class="note">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p>
++  <div class="sect">
++   <div class="secttitle"><span class="num">01</span><h2>파일 전송</h2></div>
++   <div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div>
++  </div>
++  <div class="sect" style="margin-top:12px">
++   <div class="secttitle"><span class="num">02</span><h2>재생</h2></div>
++   <div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div>
++  </div>
++  <p class="note" id="audioStatus" role="status">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p>
++ </div>
++</dialog>
++<script>
+ const token='__TOKEN__',$=id=>document.getElementById(id),labels={speech:'음성',person:'사람',backpack:'배낭',handbag:'핸드백',suitcase:'여행가방'};let state=null,connected=false,pointer=null,held=new Set(),seq=Date.now()*1000,wasMoving=false,sendBusy=false,toastTimer,records=[],target='',reportResult='',lastRecords=0;
+ function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),4000)}
+ async function api(path,data){const r=await fetch('/api/'+path,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Control-Token':token},body:data===undefined?undefined:JSON.stringify(data),cache:'no-store'});const v=await r.json();if(!r.ok)throw Error(v.error||'요청 실패');return v}
+@@ -41,7 +476,7 @@ function render(){
+   const states={recording:'영상 저장 중',queued:'STT 대기',transcribing:'STT 변환 중',ready:'저장 완료',partial:'일부 저장',error:'처리 오류'};
+   main.append(text('b',r.title),text('p',new Date(speech?m.started_at:r.time).toLocaleString('ko-KR')+' · '+(states[r.state]||r.state)));
+   if(speech){main.append(text('p',m.transcript||'인식 문장 없음'),text('small','자동 STT · 발화자 미확인','muted'))}
+-  else {main.append(text('p',r.targets.map(x=>labels[x]||x).join(', ')||'대상 정보 없음'));for(const [index,d] of (m.detections||[]).entries()){if(d.posture)main.append(text('p','#'+(index+1)+' '+d.posture.label+' · '+d.posture.reason))}}
++  else {main.append(text('p',r.targets.map(x=>labels[x]||x).join(', ')||'대상 정보 없음'));for(const [index,d] of (m.detections||[]).entries()){if(d.posture)main.append(text('p','#'+(index+1)+' '+d.posture.label+' · '+d.posture.reason,'pline p-'+d.posture.code))}}
+   const details=document.createElement('details');details.append(text('summary',speech?'원본 음성·메모':'원본 영상·메모'));
+   if(r.clip){
+    if(speech||r.clip.endsWith('.mp4')){const v=document.createElement(speech?'audio':'video');v.controls=true;v.preload='none';v.src=media(r.clip);details.append(v)}
+@@ -108,14 +543,16 @@ async function loadHistory(){try{
+  h.forEach(r=>{const b=text('button',new Date(r.time).toLocaleString('ko-KR')+' · '+r.content.selected_count+'건','source');b.onclick=()=>showHighlights(r);$('summaryHistory').append(b)});
+ }catch(e){toast(e.message)}}
+ $('reportDownload').onclick=()=>{if(!highlightResult){toast('선정 결과가 없습니다.');return}download(new Blob([JSON.stringify(highlightResult,null,2)],{type:'application/json;charset=utf-8'}),'k9-important-records.json')};
+-async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'● 연결 중':connected?'● 연결됨':'● 미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;$('events').replaceChildren();all.slice(0,3).forEach(x=>$('events').append(text('div',new Date(x.time).toLocaleTimeString('ko-KR')+' · '+x.title,'event')));if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
++async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;$('events').replaceChildren();all.slice(0,3).forEach(x=>$('events').append(text('div',new Date(x.time).toLocaleTimeString('ko-KR')+' · '+x.title,'event')));if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
+ 
+ function refreshPosture(v){
+- const e=$('postureLive');
+- if(!v.video){e.textContent='영상 연결 대기';return}
+- const people=v.detections.filter(d=>d.target==='person');
+- e.textContent=people.length?people.map((d,i)=>'#'+(i+1)+' '+(d.posture?.label||'자세 모델 미사용')).join(' · '):'사람 미탐지';
+- e.title=people.map((d,i)=>'#'+(i+1)+' '+(d.posture?.reason||'')).join(' / ');
++ const e=$('postureLive'),people=v.video?v.detections.filter(d=>d.target==='person'):[];
++ const lying=people.some(d=>d.posture?.code==='lying');
++ $('peopleCount').textContent=v.video?people.length+'명':'-';
++ $('lyingAlert').classList.toggle('hidden',!lying);$('videoCard').classList.toggle('alerting',lying);
++ const items=!v.video?[['영상 연결 대기','p-wait','']]:people.length?people.map((d,i)=>['#'+(i+1)+' '+(d.posture?.label||'자세 모델 미사용'),'p-'+(d.posture?.code||'none'),d.posture?.reason||'']):[['사람 미탐지','p-none','']];
++ const key=JSON.stringify(items);if(e.dataset.key===key)return;e.dataset.key=key;
++ e.replaceChildren(...items.map(([label,cls,reason])=>{const c=text('span',label,'pchip '+cls);if(reason)c.title=reason;return c}));
+ }
+ let speechSynced=false,lastSpeechSaved=null;
+ function refreshSpeech(s){
+@@ -167,4 +604,24 @@ $('openSettings').onclick=()=>{stop();$('settingsDialog').showModal()};
+ $('closeSettings').onclick=()=>{stop();$('settingsDialog').close()};
+ $('settingsDialog').addEventListener('cancel',stop);
+ $('settingsDialog').addEventListener('close',stop);
++</script><script>
++/* 화면 상태 표시 (디자인 개선판): 기존 동작은 바꾸지 않고 state 값만 읽어 칩·진행 표시를 갱신 */
++(()=>{
++ const chip=(id,s,label)=>{const c=$(id);if(!c)return;c.dataset.state=s;const t=c.querySelector('.label');if(t&&label!==undefined)t.textContent=label};
++ function paint(){
++  const lost=$('badge').textContent.includes('끊김');
++  if(!state||lost){chip('chipRobot',lost?'err':'off');return}
++  const r=state.robot,v=state.vision,l=state.llm,sp=state.speech;
++  chip('chipRobot',r.connecting?'busy':r.connected?'ok':'off');
++  chip('chipVideo',v.video?'ok':'off',v.video?'수신':'없음');
++  chip('chipDetect',v.detector_error?'err':v.detecting?'ok':'off',v.detector_error?'오류':v.detecting?'추정 중':'대기');
++  chip('chipLlm',l.error?'err':l.busy?'busy':'off',l.error?'오류':l.busy?'선정 중 '+(l.elapsed_seconds||0)+'s':'대기');
++  chip('chipRec',sp?.recording?'rec':'off',sp?.recording?'녹음 중':'대기');
++  $('liveBadge').classList.toggle('hidden',!v.video);
++  $('llmProgress').classList.toggle('hidden',!l.busy);
++ }
++ setInterval(paint,500);paint();
++ const onScroll=()=>document.body.classList.toggle('scrolled',scrollY>4);addEventListener('scroll',onScroll,{passive:true});onScroll();
++ $('fullscreenBtn').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else $('viewBox').requestFullscreen?.()};
++})();
+ </script></body></html>
+-- 
+2.39.5 (Apple Git-154)
+
+
+From 7649c07defea5914a742b0620e1f3a58f2d1454b Mon Sep 17 00:00:00 2001
+From: hs <gmltn0011223344@gmail.com>
+Date: Sat, 7 Nov 2026 23:50:31 +0900
+Subject: [PATCH 2/2] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94=20=ED=99=94?=
+ =?UTF-8?q?=EB=A9=B4=20=EC=8B=9C=EC=95=88=202=EC=B0=A8:=20=EA=B4=80?=
+ =?UTF-8?q?=EC=A0=9C=20=EC=BD=98=EC=86=94=20=EA=B5=AC=EC=A1=B0=EC=99=80=20?=
+ =?UTF-8?q?=EC=83=81=ED=83=9C=20=EA=B8=B0=EB=B0=98=20=EB=AA=A8=EC=85=98?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 왼쪽 내비게이션 레일 + 상단 상태 막대 + 오른쪽 인스펙터 구조로 재구성
+- 카메라 뷰포트에 HUD 모서리·타임코드, 누워 있음 후보 시 상단 경고 띠
+- 탐지된 사람: 자세 후보·탐지 신뢰도 막대·규칙 근거를 사람별로 표시
+- 이번 순찰 기록 피드를 관제 화면으로 옮기고 새 기록만 슬라이드 표시
+- 투명도는 상황별로: 읽는 영역은 불투명, 상단 막대(스크롤 시)·영상 위 표시·창·알림은 반투명
+- 모션은 상태가 바뀔 때만: 값 변경, 신뢰도 막대, 탭 전환(view transition), 커서 하이라이트
+- 3D·셰이더 효과는 넣지 않음 (같은 노트북에서 YOLO·LLM이 함께 돌기 때문)
+- 기존 요소 ID 88개·서버 API·조종 로직 유지, 스크립트는 표시 부분 4곳만 수정
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ k9_patrol_console/static/index.html | 715 +++++++++++++++-------------
+ 1 file changed, 393 insertions(+), 322 deletions(-)
+
+diff --git a/k9_patrol_console/static/index.html b/k9_patrol_console/static/index.html
+index 996a4ff..6c791e6 100644
+--- a/k9_patrol_console/static/index.html
++++ b/k9_patrol_console/static/index.html
+@@ -1,208 +1,255 @@
+ <!DOCTYPE html>
+-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>K9 PATROL · 순찰 관제</title><style>
++<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta name="color-scheme" content="light"/><title>K9 Patrol · 관제</title><style>
+ :root{
+- --bg:#e9edf1;--glass:rgba(255,255,255,.74);--glass-strong:rgba(255,255,255,.9);--solid:#fff;--sunken:rgba(241,244,247,.8);
+- --line:rgba(17,24,39,.10);--line-strong:rgba(17,24,39,.18);
+- --text:#111827;--text-2:#1f2937;--muted:#4b5563;--faint:#6b7280;
+- --navy:#1d3557;--navy-600:#16294a;--navy-50:#e8edf5;
+- --ok:#15803d;--warn:#b45309;--err:#b91c1c;--idle:#9ca3af;
+- --stand:#15803d;--sit:#1d4ed8;--lie:#b91c1c;--unk:#6b7280;
+- --r:6px;--r-s:4px;--blur:saturate(1.3) blur(14px);
++ --canvas:#eceff3;--surface:#ffffff;--surface-2:#f6f7f9;--sunken:#f1f3f6;
++ --glass:rgba(255,255,255,.72);--glass-dark:rgba(12,17,26,.58);
++ --line:#e1e5eb;--line-2:#cfd5de;--line-dark:rgba(255,255,255,.14);
++ --ink:#121821;--ink-2:#2c3542;--ink-3:#566170;--ink-4:#7d8796;
++ --rail:#0f1724;--rail-2:#1a2433;--rail-ink:#9aa6b8;
++ --accent:#2b4c7e;--accent-2:#223d66;--accent-soft:#e7edf6;
++ --ok:#1f7a4d;--warn:#b25e09;--err:#b42318;--idle:#a3abb7;
++ --stand:#1f7a4d;--sit:#2b5fb4;--lie:#b42318;--unk:#7d8796;
++ --r:6px;--r-s:4px;
++ --e-out:cubic-bezier(.16,1,.3,1);--e-std:cubic-bezier(.4,0,.2,1);
++ --font:"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Malgun Gothic",-apple-system,"Segoe UI",system-ui,sans-serif;
++ --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+ }
+ *{box-sizing:border-box}
+-body{margin:0;min-height:100vh;color:var(--text);font:14px/1.6 Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Noto Sans KR",sans-serif;font-variant-numeric:tabular-nums;
+- background:linear-gradient(rgba(17,24,39,.035) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(17,24,39,.035) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(180deg,#f3f5f8,var(--bg) 420px);background-attachment:fixed}
++html,body{height:100%}
++body{margin:0;background:var(--canvas);color:var(--ink);font:14px/1.6 var(--font);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+ button,input,select,textarea{font:inherit;color:inherit}
+-h2{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+-h3{font-size:15px;margin:8px 0}
+-a{color:var(--navy);font-weight:600;text-underline-offset:3px}
++h1,h2,h3{margin:0;letter-spacing:-.012em}
++a{color:var(--accent);font-weight:600;text-underline-offset:3px}
+ .hidden{display:none!important}
+-.mono,.tiny{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+-.tiny{font-size:11.5px;color:var(--faint)}
+-.sub,.muted{color:var(--muted)}
+-.note{font-size:13px;line-height:1.7;margin:8px 0;color:var(--muted)}
+-
+-/* buttons: flat, crisp */
+-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border:1px solid var(--line-strong);border-radius:var(--r-s);background:var(--solid);color:var(--text-2);font-weight:600;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+-button:hover:not(:disabled){background:#f3f4f6;border-color:rgba(17,24,39,.32)}
+-button:active:not(:disabled){background:#e5e7eb}
+-button:disabled{opacity:.45;cursor:not-allowed}
++.mono,.tiny{font-family:var(--mono)}
++.tiny{font-size:11.5px;color:var(--ink-4)}
++.sub,.muted{color:var(--ink-3)}
++.note{font-size:13px;line-height:1.7;margin:8px 0;color:var(--ink-3)}
++.eyebrow{font:600 11px/1 var(--font);letter-spacing:.06em;color:var(--ink-4)}
++
++/* ---------- controls ---------- */
++button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink-2);font-weight:600;font-size:13px;cursor:pointer;transition:background .15s var(--e-std),border-color .15s,color .15s,transform .12s var(--e-std)}
++button:hover:not(:disabled){background:var(--surface-2);border-color:#b9c1cd}
++button:active:not(:disabled){transform:translateY(1px)}
++button:disabled{opacity:.42;cursor:not-allowed}
+ button svg{width:16px;height:16px;flex:none}
+-.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+-.primary:hover:not(:disabled){background:var(--navy-600);border-color:var(--navy-600)}
+-.primary:active:not(:disabled){background:#0f1f38}
+-.stop{color:var(--err);border-color:rgba(185,28,28,.35);background:#fff}
+-.stop:hover:not(:disabled){background:#fef2f2;border-color:var(--err)}
++.primary{background:var(--accent);border-color:var(--accent);color:#fff}
++.primary:hover:not(:disabled){background:var(--accent-2);border-color:var(--accent-2)}
++.stop{color:var(--err);border-color:#e7b8b3}
++.stop:hover:not(:disabled){background:#fdf3f2;border-color:var(--err)}
+ .primary.stop{background:var(--err);border-color:var(--err);color:#fff}
+ .ghost{background:transparent;border-color:transparent}
+-.ghost:hover:not(:disabled){background:rgba(17,24,39,.06);border-color:transparent}
+-.icon{padding:7px}
++.ghost:hover:not(:disabled){background:rgba(18,24,33,.06);border-color:transparent}
++.icon{width:34px;padding:0}
+ .full{width:100%}
+-:is(button,input,select,textarea,a,summary):focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+-
+-/* fields */
+-input[type=text],input[type=number],textarea,select{background:var(--solid);border:1px solid var(--line-strong);border-radius:var(--r-s);padding:8px 11px;min-width:0;transition:border-color .15s,box-shadow .15s}
+-input[type=text]:focus,textarea:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(29,53,87,.12);outline:none}
++:is(button,input,select,textarea,a,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
++input[type=text],input[type=number],textarea,select{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-s);padding:7px 10px;min-width:0;transition:border-color .15s,box-shadow .15s}
++select,input[type=text]{height:34px}
++input[type=text]:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,76,126,.14);outline:none}
+ input[type=text],textarea{width:100%}
+-textarea{resize:vertical;min-height:70px}
+-input[type=range],input[type=checkbox]{accent-color:var(--navy)}
+-label{font-size:13px;color:var(--text-2);font-weight:600}
+-summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);list-style:none;display:flex;align-items:center;gap:8px}
++textarea{resize:vertical;min-height:72px;line-height:1.6}
++input[type=range],input[type=checkbox]{accent-color:var(--accent)}
++label{font-size:13px;color:var(--ink-2);font-weight:600}
++summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
+ summary::-webkit-details-marker{display:none}
+-summary:before{content:"+";display:grid;place-items:center;width:16px;height:16px;border:1px solid var(--line-strong);border-radius:3px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--muted)}
+-details[open]>summary:before{content:"−"}
+-
+-/* top bar: transparent at top, frosted when scrolled */
+-.app{max-width:1320px;margin:auto;padding:0 24px 40px}
+-.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:18px;padding:12px 24px;margin:0 -24px 4px;border-bottom:1px solid transparent;transition:background .25s,border-color .25s,backdrop-filter .25s}
+-body.scrolled .topbar{background:rgba(243,245,248,.72);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom-color:var(--line)}
+-.brandbox{display:flex;align-items:center;gap:11px}
+-.logo{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--r-s);font:700 14px ui-monospace,Menlo,monospace;color:#fff;background:var(--navy)}
+-.brand{font-weight:800;font-size:15px;letter-spacing:.08em}
+-.brandbox .sub{font-size:12px}
++summary:before{content:"";width:6px;height:6px;border-right:1.5px solid var(--ink-3);border-bottom:1.5px solid var(--ink-3);transform:rotate(-45deg);transition:transform .2s var(--e-out)}
++details[open]>summary:before{transform:rotate(45deg)}
++
++/* ---------- shell: dark rail + main ---------- */
++.shell{display:grid;grid-template-columns:76px minmax(0,1fr);min-height:100vh}
++.rail{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0;background:var(--rail);border-right:1px solid #0a101a;z-index:20}
++.mark{display:grid;place-items:center;width:40px;height:40px;margin-bottom:14px;border:1.5px solid #3a4a63;border-radius:var(--r);color:#e8edf5;font:700 13px var(--mono);letter-spacing:.02em}
++.rail button{position:relative;flex-direction:column;gap:5px;width:60px;height:58px;padding:0;border:0;border-radius:var(--r);background:transparent;color:var(--rail-ink);font-size:11.5px;font-weight:600}
++.rail button svg{width:20px;height:20px}
++.rail button:hover:not(:disabled){background:var(--rail-2);color:#e8edf5}
++.rail button.active{background:var(--rail-2);color:#fff}
++.rail button.active:before{content:"";position:absolute;left:-8px;top:14px;bottom:14px;width:3px;border-radius:0 2px 2px 0;background:#7fa6e8;animation:grow .3s var(--e-out)}
++.rail .spacer{flex:1}
++#count{position:absolute;top:5px;left:calc(50% + 5px);min-width:18px;height:16px;padding:0 4px;border-radius:3px;background:#3a4d6b;color:#eef2f8;font:600 10px/16px var(--mono);text-align:center;box-shadow:0 0 0 2px var(--rail)}
++.rail button.active #count,.rail button:hover #count{box-shadow:0 0 0 2px var(--rail-2)}
++.main{min-width:0;display:flex;flex-direction:column}
++
++/* top bar: transparent at rest, frosted when content scrolls under it */
++.topbar{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:16px;height:60px;padding:0 24px;border-bottom:1px solid transparent;transition:background .25s var(--e-std),border-color .25s}
++body.scrolled .topbar{background:rgba(236,239,243,.74);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:var(--line)}
++.crumbs{display:flex;align-items:baseline;gap:10px;min-width:0}
++.crumbs h1{font-size:17px;font-weight:700}
++.crumbs .sub{font-size:13px;white-space:nowrap}
+ .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+ 
+-/* status bar: instrument-panel style */
+-.statusbar{display:flex;margin-left:6px;border:1px solid var(--line-strong);border-radius:var(--r-s);background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);overflow:hidden}
+-.cell{display:flex;align-items:center;gap:7px;padding:6px 12px;font-size:12.5px;color:var(--text-2);white-space:nowrap}
++/* status bar */
++.statusbar{display:flex;height:34px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden}
++.cell{display:flex;align-items:center;gap:7px;padding:0 12px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+ .cell+.cell{border-left:1px solid var(--line)}
+-.cell .k{font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--faint)}
+-.led{width:7px;height:7px;border-radius:1px;background:var(--idle);flex:none}
+-.cell[data-state=ok] .led{background:var(--ok)}
+-.cell[data-state=busy] .led{background:var(--warn);animation:blink 1.4s steps(2,jump-none) infinite}
++.cell .k{font:600 10.5px var(--mono);letter-spacing:.06em;color:var(--ink-4)}
++.cell .v{display:inline-block;min-width:3ch}
++.cell .v.tick{animation:tick .35s var(--e-out)}
++.led{width:6px;height:6px;border-radius:50%;background:var(--idle);flex:none;transition:background .3s,box-shadow .3s}
++.cell[data-state=ok] .led{background:var(--ok);box-shadow:0 0 0 3px rgba(31,122,77,.14)}
++.cell[data-state=busy] .led{background:var(--warn);box-shadow:0 0 0 3px rgba(178,94,9,.16);animation:breathe 1.6s ease-in-out infinite}
+ .cell[data-state=err] .led{background:var(--err)}
+-.cell[data-state=err]{color:var(--err)}
+-.cell[data-state=rec] .led{background:var(--err);animation:blink 1s steps(2,jump-none) infinite}
+-
+-/* tabs: underline */
+-.tabs{display:flex;gap:2px;margin:6px 0 16px;border-bottom:1px solid var(--line-strong)}
+-.tabs button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:10px 14px;margin-bottom:-1px;border-bottom:2px solid transparent;font-size:14px}
+-.tabs button:hover:not(:disabled){background:transparent;color:var(--text)}
+-.tabs button.active{color:var(--text);border-bottom-color:var(--navy)}
+-#count{display:inline-block;min-width:20px;padding:0 5px;border-radius:3px;background:rgba(17,24,39,.08);color:var(--text-2);font:600 11.5px/18px ui-monospace,Menlo,monospace;text-align:center}
+-
+-/* notice */
+-.notice{padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.7;color:var(--muted);background:var(--glass);border:1px solid var(--line);margin-bottom:14px}
++.cell[data-state=err] .v{color:var(--err)}
++.cell[data-state=rec] .led{background:var(--err);animation:breathe 1s ease-in-out infinite}
++
++/* content */
++.content{padding:4px 24px 32px}
++.notice{padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.7;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);margin-bottom:14px}
+ .quiet-status{display:none}
+-.quiet-status.error-visible{display:block;color:var(--err);background:rgba(254,242,242,.9);border-color:rgba(185,28,28,.3);border-left:3px solid var(--err)}
+-
+-/* cards: translucent panels */
+-.card{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(17,24,39,.05);overflow:hidden}
+-.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
+-.cardsub{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+-.headactions{display:flex;gap:6px;align-items:center}
+-.cardbody{padding:14px 16px}
+-#live:not(.hidden),#archive:not(.hidden){animation:fadeIn .25s ease-out}
+-.livegrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+-.side{display:grid;gap:14px}
+-
+-/* video + translucent overlays */
+-.view{position:relative;aspect-ratio:16/9;background:#0b0f15;overflow:hidden}
++.quiet-status.error-visible{display:block;color:var(--err);background:#fdf3f2;border-color:#f0c9c4;animation:slideDown .3s var(--e-out)}
++
++/* panels with cursor-follow light */
++.panel{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 0 rgba(18,24,33,.03);overflow:hidden;isolation:isolate}
++.panel:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(43,76,126,.06),transparent 60%)}
++.panel:hover:after{opacity:1}
++.phead{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 16px;border-bottom:1px solid var(--line)}
++.phead h2{font-size:14px;font-weight:700}
++.phead .meta{font-size:12.5px;color:var(--ink-4)}
++.phead .tools{margin-left:auto;display:flex;gap:6px;align-items:center}
++.pbody{padding:14px 16px}
++.reveal{animation:rise .5s var(--e-out) both}
++.reveal:nth-child(2){animation-delay:.06s}.reveal:nth-child(3){animation-delay:.12s}.reveal:nth-child(4){animation-delay:.18s}
++
++.livegrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}
++.inspector{display:grid;gap:14px}
++
++/* ---------- camera viewport ---------- */
++.view{position:relative;aspect-ratio:16/9;background:#080b10;overflow:hidden}
+ .view:fullscreen{aspect-ratio:auto}
+-.cameraempty{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;pointer-events:none;color:#cbd5e1;
+- background:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px) 0 0/28px 28px,#0b0f15}
+-.cameraempty strong{font-size:16px;font-weight:700;color:#e5e7eb;letter-spacing:.02em}
+-.cameraempty p{margin:0;font-size:13px;color:#9ca3af}
+-.cameraempty .ring{display:grid;place-items:center;width:44px;height:44px;border:1px solid rgba(156,163,175,.35);border-radius:var(--r-s);margin-bottom:4px}
+-.cameraempty .ring svg{width:22px;height:22px;color:#9ca3af}
+-.scan{position:absolute;left:0;right:0;height:1px;top:0;background:rgba(156,163,175,.35);box-shadow:0 0 12px rgba(156,163,175,.4);animation:scan 4s linear infinite}
+-.ovl{position:absolute;background:rgba(9,12,17,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#f3f4f6;border:1px solid rgba(255,255,255,.12);border-radius:var(--r-s)}
+-.livebadge{top:12px;left:12px;display:flex;align-items:center;gap:6px;padding:3px 8px;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.14em}
+-.livebadge:before{content:"";width:7px;height:7px;border-radius:1px;background:#ef4444;animation:blink 1.2s steps(2,jump-none) infinite}
+-.stamp{bottom:12px;left:12px;padding:3px 8px;font:12px ui-monospace,Menlo,monospace}
++.view img{display:block}
++.cameraempty{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:8px;text-align:center;pointer-events:none;color:#c7ced8;
++ background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px),radial-gradient(70% 70% at 50% 45%,#141b26,#080b10)}
++.cameraempty .sig{font:600 11px var(--mono);letter-spacing:.24em;color:#7f8a99}
++.cameraempty strong{font-size:17px;font-weight:700;color:#e6eaf0}
++.cameraempty p{margin:0;font-size:13px;color:#8d97a6}
++.scan{position:absolute;left:0;right:0;height:80px;top:-80px;background:linear-gradient(180deg,transparent,rgba(127,166,232,.07),transparent);animation:scan 5s linear infinite}
++.hud{position:absolute;inset:14px;pointer-events:none}
++.hud i{position:absolute;width:18px;height:18px;border-color:rgba(255,255,255,.55);border-style:solid;border-width:0}
++.hud i:nth-child(1){top:0;left:0;border-top-width:1.5px;border-left-width:1.5px}
++.hud i:nth-child(2){top:0;right:0;border-top-width:1.5px;border-right-width:1.5px}
++.hud i:nth-child(3){bottom:0;left:0;border-bottom-width:1.5px;border-left-width:1.5px}
++.hud i:nth-child(4){bottom:0;right:0;border-bottom-width:1.5px;border-right-width:1.5px}
++.ovl{position:absolute;background:var(--glass-dark);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#eef1f5;border:1px solid var(--line-dark);border-radius:var(--r-s)}
++.livebadge{top:24px;left:24px;display:flex;align-items:center;gap:7px;height:24px;padding:0 9px;font:700 11px var(--mono);letter-spacing:.16em;animation:fadeIn .3s}
++.livebadge:before{content:"";width:6px;height:6px;border-radius:50%;background:#f04438;animation:breathe 1.4s ease-in-out infinite}
++.stamp{bottom:24px;left:24px;height:24px;display:flex;align-items:center;padding:0 9px;font:12px var(--mono)}
+ .stamp:empty{display:none}
+-.alertbanner{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:9px 14px;background:rgba(185,28,28,.86);backdrop-filter:blur(6px);color:#fff;font-weight:700;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.2)}
++.alertbanner{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:10px;height:42px;padding:0 16px;background:rgba(180,35,24,.88);backdrop-filter:blur(8px);color:#fff;font-weight:700;font-size:13.5px;animation:slideDown .35s var(--e-out)}
++.alertbanner:after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:rgba(255,255,255,.55);transform-origin:left;animation:sweep 2s linear infinite}
+ .alertbanner svg{width:17px;height:17px}
+-.alertbanner~.livebadge{top:52px}
+-.videocard.alerting{border-color:rgba(185,28,28,.55);box-shadow:0 0 0 2px rgba(185,28,28,.25)}
+-
+-/* posture tags: square, left color rule */
+-.posturelist{display:flex;flex-wrap:wrap;gap:6px;margin:0;min-height:34px;align-items:center}
+-.pchip,.pline{display:inline-flex;align-items:center;padding:5px 10px;border-radius:var(--r-s);border:1px solid var(--line);border-left:3px solid var(--unk);background:var(--solid);font-size:13px;font-weight:700;color:var(--text-2)}
+-.p-standing{border-left-color:var(--stand)}.p-sitting{border-left-color:var(--sit)}
+-.p-lying{border-left-color:var(--lie);color:var(--err);background:#fef2f2}
+-.p-wait,.p-none{font-weight:600;color:var(--muted)}
+-.metrics{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--r-s);margin-top:12px;background:var(--sunken)}
+-.metric{padding:9px 12px}
+-.metric+.metric{border-left:1px solid var(--line)}
+-.metric span{display:block;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
+-.metric b{display:block;margin-top:2px;font-size:15px}
+-.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
+-.legend i{display:inline-block;width:10px;height:3px;margin-right:6px;vertical-align:middle}
+-
+-/* quick record */
+-.recbar{display:flex;align-items:center;gap:8px}
+-#recordingState{font-size:12.5px;color:var(--muted)}
+-.quicknote{display:grid;gap:10px}
+-.quicknote textarea{min-height:84px}
+-
+-/* highlights */
+-.main-highlights{margin-top:14px}
+-.progress{height:2px;background:rgba(29,53,87,.12);overflow:hidden}
+-.progress span{display:block;height:100%;width:30%;background:var(--navy);animation:indet 1.2s ease-in-out infinite}
+-#llmStatus{margin-top:0}
+-#highlightCards>.note{display:inline-block;margin:0 6px 10px 0;padding:2px 8px;border-radius:3px;background:rgba(17,24,39,.06);font-size:12px;color:var(--text-2)}
+-.highlight-card{margin:10px 0;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--glass-strong)}
++.alertbanner~.livebadge{top:58px}
++.videocard.alerting{border-color:#e4a59e;box-shadow:0 0 0 3px rgba(180,35,24,.12)}
++.vfoot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line)}
++.stat{padding:10px 16px}
++.stat+.stat{border-left:1px solid var(--line)}
++.stat .eyebrow{display:block;margin-bottom:4px}
++.stat b{font-size:15px;font-weight:700}
++.stat b.tick{display:inline-block;animation:tick .35s var(--e-out)}
++
++/* ---------- inspector: subjects ---------- */
++.subjects{display:grid;gap:8px;min-height:42px}
++.subject{padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--unk);border-radius:var(--r-s);background:var(--surface);animation:rise .35s var(--e-out) both}
++.subject:nth-child(2){animation-delay:.05s}.subject:nth-child(3){animation-delay:.1s}
++.subject-top{display:flex;align-items:baseline;gap:8px}
++.subject-n{font:600 12px var(--mono);color:var(--ink-4)}
++.subject-label{font-weight:700;font-size:14px}
++.subject-conf{margin-left:auto;font:12px var(--mono);color:var(--ink-3)}
++.subject-bar{height:3px;margin:8px 0 6px;background:var(--sunken);border-radius:2px;overflow:hidden}
++.subject-bar i{display:block;height:100%;width:var(--w,0);background:var(--unk);transform-origin:left;animation:fill .6s var(--e-out)}
++.subject-reason{margin:0;font-size:12.5px;color:var(--ink-3);line-height:1.55}
++.subject.p-standing{border-left-color:var(--stand)}.subject.p-standing .subject-bar i{background:var(--stand)}
++.subject.p-sitting{border-left-color:var(--sit)}.subject.p-sitting .subject-bar i{background:var(--sit)}
++.subject.p-lying{border-left-color:var(--lie);background:#fdf6f5}.subject.p-lying .subject-label{color:var(--err)}.subject.p-lying .subject-bar i{background:var(--lie)}
++.subject-empty{margin:0;padding:12px;border:1px dashed var(--line-2);border-radius:var(--r-s);font-size:13px;color:var(--ink-4);text-align:center;background:var(--surface-2)}
++.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--ink-3)}
++.legend i{display:inline-block;width:10px;height:3px;border-radius:1px;margin-right:6px;vertical-align:middle}
++.confnote{margin:8px 0 0;font-size:11.5px;color:var(--ink-4)}
++
++/* events feed */
++.events{display:grid}
++.event{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line);animation:slideIn .4s var(--e-out) both}
++.event:last-child{border-bottom:0}
++.event:nth-child(2){animation-delay:.04s}.event:nth-child(3){animation-delay:.08s}.event:nth-child(4){animation-delay:.12s}.event:nth-child(5){animation-delay:.16s}
++.event-t{font:12px var(--mono);color:var(--ink-4)}
++.event-title{font-size:13.5px;font-weight:600;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
++.event.is-speech .event-title:before,.event.is-person .event-title:before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:1px;vertical-align:2px;background:var(--sit)}
++.event.is-speech .event-title:before{background:var(--warn)}
++
++/* memo */
++.memo{display:grid;gap:10px}
++.recrow{display:flex;align-items:center;gap:8px}
++#recordingState{font-size:12.5px;color:var(--ink-3);margin-right:auto}
++
++/* ---------- review queue (LLM) ---------- */
++.review{margin-top:14px}
++.progress{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden}
++.progress span{display:block;height:100%;width:28%;background:var(--accent);animation:indet 1.2s var(--e-std) infinite}
++.review .phead{position:relative}
++#llmStatus{margin:0 0 12px}
++#highlightCards>.note{display:inline-block;margin:0 6px 10px 0;padding:2px 8px;border:1px solid var(--line);border-radius:3px;background:var(--surface-2);font-size:12px;color:var(--ink-3)}
++.highlight-card{display:block;margin:10px 0;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);animation:rise .4s var(--e-out) both;transition:border-color .2s,box-shadow .2s}
++.highlight-card:hover{border-color:var(--line-2);box-shadow:0 6px 18px -12px rgba(18,24,33,.35)}
++.highlight-card:nth-of-type(2){animation-delay:.05s}.highlight-card:nth-of-type(3){animation-delay:.1s}.highlight-card:nth-of-type(4){animation-delay:.15s}.highlight-card:nth-of-type(5){animation-delay:.2s}
+ .highlight-head{display:flex;gap:14px;align-items:flex-start}
+-.highlight-head img{width:168px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line)}
++.highlight-head img{width:176px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line);background:var(--sunken)}
+ .highlight-body{flex:1;min-width:0}
+-.highlight-body>b{display:block;margin-top:10px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--faint)}
+-.highlight-body>b:first-child{margin-top:0;font:700 15px/1.45 Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;letter-spacing:-.01em;color:var(--text)}
+-.highlight-reason{margin:4px 0 0;padding:8px 12px;border-left:2px solid var(--navy);background:rgba(29,53,87,.05);font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+-.highlight-card details{margin:10px 0}
++.highlight-body>b{display:block;margin-top:12px;font:600 11px var(--font);letter-spacing:.04em;color:var(--ink-4)}
++.highlight-body>b:first-child{margin-top:0;font:700 15px/1.45 var(--font);letter-spacing:-.01em;color:var(--ink)}
++.highlight-body>.note{margin:2px 0}
++.highlight-reason{margin:4px 0 0;font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
++.highlight-card details{margin:10px 0 6px}
+ .highlight-card audio,.highlight-card video{width:100%;max-width:560px;display:block;margin-top:10px}
+ .highlight-card>a{display:inline-block;margin:6px 14px 6px 0;font-size:13px}
+-.evidence-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-2);font-size:13px;line-height:1.7}
++.highlight-card>button{height:30px;font-size:12.5px}
++.evidence-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink-2);font-size:13px;line-height:1.7}
+ .highlight-card details b{display:block;margin-top:12px;font-size:12px}
+-.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r);background:var(--sunken)}
++.empty{padding:26px;text-align:center;color:var(--ink-4);border:1px dashed var(--line-2);border-radius:var(--r);background:var(--surface-2);font-size:13.5px}
+ .actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+ .actions input{flex:1;min-width:80px}
+ .summarydetails{margin-top:14px}
+ #summaryHistory{display:grid;gap:4px;margin-top:10px}
+-.source{justify-content:flex-start;width:100%;overflow-wrap:anywhere;font-weight:500;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+-
+-/* records */
+-.searchAssist{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+-.searchAssist h3{display:none}
+-.chips{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:var(--r-s);overflow:hidden}
+-.chips button{border:0;border-radius:0;padding:7px 13px;font-size:13px;background:var(--solid)}
+-.chips button+button{border-left:1px solid var(--line-strong)}
+-.searchAssist .actions{margin:0}
+-.searchAssist label{display:flex;gap:6px;align-items:center}
+-#targetFilter{padding:2px 8px;border-radius:3px;background:var(--navy-50);color:var(--navy);font-size:12px;font-weight:600}
+-.filters{padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);background:var(--sunken)}
+-.filters input{flex:1;min-width:160px}
+-.records{padding:4px 16px 16px}
+-.record{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
++.source{justify-content:flex-start;width:100%;font:500 12.5px var(--mono)}
++
++/* ---------- records ---------- */
++.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
++.toolbar h3{display:none}
++.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:var(--r-s);overflow:hidden;background:var(--surface)}
++.seg button{height:32px;border:0;border-radius:0;font-size:13px}
++.seg button+button{border-left:1px solid var(--line-2)}
++.toolbar label{display:flex;gap:6px;align-items:center}
++#targetFilter{padding:2px 8px;border-radius:3px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600}
++.toolbar input[type=text]{flex:1;min-width:180px}
++.records{padding:0 16px 8px}
++.record{display:grid;grid-template-columns:168px minmax(0,1fr);gap:16px;padding:16px 0;border-bottom:1px solid var(--line);animation:fadeIn .35s var(--e-out)}
+ .record:last-child{border-bottom:0}
+-.record img{width:156px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line);flex:none}
+-.recordmain{flex:1;min-width:0}
++.record:not(:has(img)){grid-template-columns:minmax(0,1fr)}
++.record img{width:168px;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line);background:var(--sunken);transition:transform .3s var(--e-out)}
++.record:hover img{transform:scale(1.015)}
++.recordmain{min-width:0}
+ .recordmain>b{font-size:15px}
+-.record p{margin:3px 0;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+-.record small{font-size:12px}
++.record p{margin:3px 0;font-size:13px;color:var(--ink-3);overflow-wrap:anywhere}
++.record small{font-size:12px;color:var(--ink-4)}
+ .record details{margin-top:10px}
+ .record input,.record textarea{margin-top:10px}
+ .record audio{display:block;width:100%;max-width:520px;margin:10px 0}
+ .record video{width:100%;max-width:520px;margin-top:10px}
+ .record details>a{margin-right:10px;font-size:13px}
+-.pline{margin:6px 6px 0 0!important;font-size:12.5px!important;font-weight:600}
+-.pline.p-lying{color:var(--err)}
++.pline{display:inline-flex!important;align-items:center;margin:6px 6px 0 0!important;padding:3px 9px;border:1px solid var(--line);border-left:3px solid var(--unk);border-radius:var(--r-s);background:var(--surface);font-size:12.5px!important;font-weight:600;color:var(--ink-2)!important}
++.pline.p-standing{border-left-color:var(--stand)}.pline.p-sitting{border-left-color:var(--sit)}
++.pline.p-lying{border-left-color:var(--lie);color:var(--err)!important;background:#fdf6f5}
+ .excluded{opacity:.55}
+-.archivefoot{margin-top:14px}
+-
+-/* dialogs: frosted */
+-dialog{border:1px solid rgba(255,255,255,.6);padding:0;border-radius:var(--r);width:min(940px,calc(100vw - 28px));max-height:88vh;overflow:auto;background:rgba(243,245,248,.86);backdrop-filter:saturate(1.3) blur(18px);-webkit-backdrop-filter:saturate(1.3) blur(18px);color:var(--text);box-shadow:0 24px 64px -24px rgba(17,24,39,.5)}
+-dialog[open]{animation:fadeIn .18s ease-out}
+-dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+-.settingshead{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(248,250,252,.82);backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
+-.settingshead h2{font-size:16px}
+-.settingsgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 18px 20px}
+-.settingsgrid .wide{grid-column:1/-1}
+-.sect{background:var(--glass-strong);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+-.secttitle{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+-.secttitle .num{font:600 11.5px ui-monospace,Menlo,monospace;color:var(--faint)}
+-.secttitle h2{font-size:14px}
+-.secttitle .tiny{margin-left:auto}
++.foot{margin-top:14px}
++
++/* ---------- dialogs ---------- */
++dialog{border:1px solid rgba(255,255,255,.7);padding:0;border-radius:8px;width:min(960px,calc(100vw - 28px));max-height:88vh;overflow:auto;background:rgba(244,246,249,.88);backdrop-filter:saturate(1.4) blur(20px);-webkit-backdrop-filter:saturate(1.4) blur(20px);color:var(--ink);box-shadow:0 30px 80px -24px rgba(10,15,25,.55)}
++dialog[open]{animation:dialogIn .28s var(--e-out)}
++dialog::backdrop{background:rgba(10,15,25,.36);backdrop-filter:blur(2px)}
++.dhead{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;height:56px;padding:0 18px;background:rgba(248,249,251,.8);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
++.dhead h2{font-size:16px}
++.dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 18px 20px}
++.dgrid .wide{grid-column:1/-1}
++.sect{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
++.sect>h3{font-size:14px;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:8px}
++.sect>h3 .tiny{margin-left:auto;font-weight:400}
+ .field{display:grid;gap:6px;margin-bottom:12px}
+ .fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+ .fieldrow label,.field label{display:grid;gap:6px}
+@@ -210,154 +257,177 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+ .switch{display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0}
+ .range{display:flex;align-items:center;gap:10px;margin:10px 0;font-size:13px}
+ .range input[type=range]{flex:1;min-width:90px}
+-#speedValue,#confidenceValue{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+-.sample{font:12.5px/1.7 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-line;margin:10px 0;padding:8px 10px;border-radius:var(--r-s);background:var(--sunken);border:1px solid var(--line)}
+-.eventlist{display:none}
+-.kbd{display:inline-block;padding:0 5px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:3px;background:var(--solid);font:11.5px/18px ui-monospace,Menlo,monospace;color:var(--text-2)}
++#speedValue,#confidenceValue{font:12.5px var(--mono);min-width:56px}
++.sample{font:12.5px/1.7 var(--mono);color:var(--ink-3);white-space:pre-line;margin:10px 0;padding:8px 10px;border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--line)}
++.kbd{display:inline-block;min-width:20px;padding:0 5px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:3px;background:var(--surface);font:11.5px/18px var(--mono);color:var(--ink-2);text-align:center}
+ .controlbody{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+ .dpad{display:grid;grid-template-columns:repeat(3,44px);gap:4px}
+-.dpad button{padding:0;height:40px;font-size:17px;touch-action:none;user-select:none}
+-.held{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}
++.dpad button{height:40px;padding:0;font-size:16px;touch-action:none;user-select:none}
++.held{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+ .controlinfo{flex:1;min-width:180px}
+ .pose{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+ .timerbox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+-.timerbox strong{font:700 28px ui-monospace,Menlo,monospace;letter-spacing:.04em;color:var(--text)}
+-#timerStatus{margin:0;padding:2px 8px;border-radius:3px;background:rgba(17,24,39,.06);font-size:12.5px;color:var(--text-2)}
++.timerbox strong{font:600 28px var(--mono);letter-spacing:.02em;color:var(--ink)}
++#timerStatus{margin:0;padding:2px 8px;border-radius:3px;background:var(--sunken);font-size:12.5px;color:var(--ink-2)}
+ .compactdetail .detailbody{margin-top:12px}
+ .audioupload,.audioplay{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap}
+ .audioupload input{flex:1;min-width:180px;font-size:13px}
+ .audioplay select{flex:1;min-width:160px}
+ #audioDialog{width:min(620px,calc(100vw - 28px))}
+-#audioDialog .audioarea{padding:16px 18px 20px}
++#audioDialog .dbody{padding:16px 18px 20px;display:grid;gap:12px}
+ #connect{display:none}
++.composer{display:flex;justify-content:flex-end}
+ 
+ /* toast */
+-.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:min(560px,90vw);background:rgba(17,24,39,.9);backdrop-filter:blur(8px);color:#f9fafb;padding:11px 16px;border-radius:var(--r);font-size:13px;font-weight:600;z-index:40;box-shadow:0 12px 32px -12px rgba(17,24,39,.6);animation:toastIn .2s ease-out}
++.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(560px,90vw);background:rgba(18,24,33,.88);backdrop-filter:blur(10px);color:#f5f7fa;padding:11px 16px;border-radius:var(--r);font-size:13px;font-weight:600;z-index:60;box-shadow:0 16px 40px -14px rgba(10,15,25,.6);animation:toastIn .3s var(--e-out)}
++
++/* view transitions between tabs */
++::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:var(--e-std)}
+ 
+-/* motion: short and quiet */
++/* ---------- motion ---------- */
++@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+ @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+-@keyframes blink{50%{opacity:.25}}
+-@keyframes scan{from{top:0}to{top:100%}}
+-@keyframes indet{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+-@keyframes toastIn{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
+-@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+-
+-/* responsive */
+-@media(max-width:1180px){.cell .k{display:none}}
+-@media(max-width:1020px){.statusbar .cell:nth-child(n+4){display:none}}
+-@media(max-width:900px){.livegrid{grid-template-columns:1fr}.side{grid-template-columns:1fr 1fr}.statusbar{display:none}}
+-@media(max-width:720px){.app{padding:0 14px 28px}.topbar{padding:10px 14px;margin:0 -14px 4px}.side{grid-template-columns:1fr}.settingsgrid{grid-template-columns:1fr}.fieldrow{grid-template-columns:1fr}.record{flex-wrap:wrap}.record img{width:100%}.highlight-head{flex-direction:column}.highlight-head img{width:100%}.brandbox .sub{display:none}.right button .lbl{display:none}}
++@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
++@keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
++@keyframes tick{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
++@keyframes grow{from{transform:scaleY(0)}to{transform:none}}
++@keyframes fill{from{transform:scaleX(0)}to{transform:none}}
++@keyframes breathe{50%{opacity:.35}}
++@keyframes scan{to{top:100%}}
++@keyframes sweep{from{transform:scaleX(0)}to{transform:scaleX(1)}}
++@keyframes indet{from{transform:translateX(-100%)}to{transform:translateX(360%)}}
++@keyframes dialogIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
++@keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
++@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}::view-transition-group(*){animation:none!important}}
++
++/* ---------- responsive ---------- */
++@media(max-width:1240px){.cell .k{display:none}}
++@media(max-width:1100px){.statusbar .cell:nth-child(n+4){display:none}.livegrid{grid-template-columns:minmax(0,1fr) 320px}}
++@media(max-width:940px){.livegrid{grid-template-columns:1fr}.inspector{grid-template-columns:1fr 1fr}.crumbs .sub{display:none}}
++@media(max-width:760px){.shell{grid-template-columns:1fr}.rail{position:sticky;top:0;height:auto;flex-direction:row;justify-content:space-between;padding:6px 10px;border-right:0}.mark{margin:0}.rail .spacer{display:none}.rail button{width:54px;height:48px}.rail button.active:before{left:12px;right:12px;top:auto;bottom:-6px;width:auto;height:3px}.topbar{position:static;height:auto;padding:12px 14px}.statusbar{display:none}.content{padding:4px 14px 28px}.inspector{grid-template-columns:1fr}.dgrid,.fieldrow{grid-template-columns:1fr}.record{grid-template-columns:1fr}.record img{width:100%}.highlight-head{flex-direction:column}.highlight-head img{width:100%}.vfoot{grid-template-columns:1fr 1fr 1fr}}
+ </style></head>
+-<body><main class="app">
+-<header class="topbar">
+- <div class="brandbox"><div class="logo">K9</div><div><div class="brand">K9 PATROL</div><div class="sub">사각지대 순찰 관제</div></div></div>
+- <div class="statusbar" aria-label="시스템 상태">
+-  <span class="cell" id="chipRobot" data-state="off"><i class="led"></i><span class="k">ROBOT</span><span id="badge">미연결</span></span>
+-  <span class="cell" id="chipVideo" data-state="off"><i class="led"></i><span class="k">VIDEO</span><span class="label">없음</span></span>
+-  <span class="cell" id="chipDetect" data-state="off"><i class="led"></i><span class="k">POSE</span><span class="label">대기</span></span>
+-  <span class="cell" id="chipLlm" data-state="off"><i class="led"></i><span class="k">LLM</span><span class="label">대기</span></span>
+-  <span class="cell" id="chipRec" data-state="off"><i class="led"></i><span class="k">REC</span><span class="label">대기</span></span>
+- </div>
+- <div class="right">
+-  <button id="openAudio" title="로봇 스피커로 음성 재생"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg><span class="lbl">오디오 재생</span></button>
+-  <button id="openSettings" title="연결·조종·모델 설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">설정</span></button>
+- </div>
+-</header>
+-<nav class="tabs" aria-label="화면 전환"><button class="active" id="liveTab">관제</button><button id="recordsTab">기록 <span id="count">0</span></button><button id="speechMenu">음성</button></nav>
+-<div class="notice quiet-status" id="notice">로컬 관제 · 실제 로봇 연결 전입니다. 미연결 기능은 결과를 생성하지 않습니다.</div>
+-
+-<section id="live">
+- <div class="livegrid">
+-  <div class="card videocard" id="videoCard">
+-   <div class="cardhead">
+-    <div><h2>순찰 전방 영상</h2><p class="cardsub">Go2 전방 카메라 · 실시간 자세 추정</p></div>
+-    <div class="headactions">
+-     <button class="ghost icon" id="fullscreenBtn" title="전체 화면" aria-label="영상 전체 화면"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+-     <button class="primary" id="capture"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>캡처</button>
+-    </div>
+-   </div>
+-   <div class="view" id="viewBox">
+-    <img alt="Go2 실시간 전방 영상" id="camera" style="width:100%;height:100%;object-fit:contain;visibility:hidden"/>
+-    <div class="cameraempty" id="videoWaiting"><div class="scan"></div><div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7 16 12l7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div><strong>미연결</strong><p>설정에서 Go2를 연결하면 영상이 표시됩니다</p></div>
+-    <div class="alertbanner hidden" id="lyingAlert" role="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>누워 있음 후보 감지 · 영상을 직접 확인하세요</div>
+-    <div class="ovl livebadge hidden" id="liveBadge">LIVE</div>
+-    <div class="ovl stamp" id="clock"></div>
++<body><div class="shell">
++<nav class="rail" aria-label="주 메뉴">
++ <div class="mark" aria-hidden="true">K9</div>
++ <button class="active" id="liveTab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>관제</button>
++ <button id="recordsTab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>기록<span id="count">0</span></button>
++ <button id="speechMenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>음성</button>
++ <div class="spacer"></div>
++ <button id="openAudio" title="로봇 스피커로 안내 음성 재생"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>방송</button>
++ <button id="openSettings" title="연결·조종·모델 설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>설정</button>
++</nav>
++
++<div class="main">
++ <header class="topbar">
++  <div class="crumbs"><h1>K9 Patrol</h1><span class="sub">사각지대 순찰 관제</span></div>
++  <div class="right">
++   <div class="statusbar" aria-label="시스템 상태">
++    <span class="cell" id="chipRobot" data-state="off"><i class="led"></i><span class="k">ROBOT</span><span class="v" id="badge">미연결</span></span>
++    <span class="cell" id="chipVideo" data-state="off"><i class="led"></i><span class="k">VIDEO</span><span class="v label">없음</span></span>
++    <span class="cell" id="chipDetect" data-state="off"><i class="led"></i><span class="k">POSE</span><span class="v label">대기</span></span>
++    <span class="cell" id="chipLlm" data-state="off"><i class="led"></i><span class="k">LLM</span><span class="v label">대기</span></span>
++    <span class="cell" id="chipRec" data-state="off"><i class="led"></i><span class="k">REC</span><span class="v label">대기</span></span>
+    </div>
+   </div>
+-
+-  <aside class="side">
+-   <div class="card">
+-    <div class="cardhead"><div><h2>현재 자세</h2><p class="cardsub">관절 규칙 기반 후보 · 확정 아님</p></div></div>
+-    <div class="cardbody">
+-     <p class="posturelist" id="postureLive" role="status">자세 추정 대기</p>
+-     <div class="metrics">
+-      <div class="metric"><span>탐지된 사람</span><b id="peopleCount">-</b></div>
+-      <div class="metric"><span>로봇 제어 모드</span><b id="robotState">미연결</b></div>
++ </header>
++
++ <div class="content">
++ <div class="notice quiet-status" id="notice">로컬 관제 · 실제 로봇 연결 전입니다. 미연결 기능은 결과를 생성하지 않습니다.</div>
++
++ <section id="live">
++  <div class="livegrid">
++   <div class="panel videocard reveal" id="videoCard">
++    <div class="phead">
++     <h2>전방 카메라</h2><span class="meta">Go2 · 자세 추정</span>
++     <div class="tools">
++      <button class="ghost icon" id="fullscreenBtn" title="전체 화면" aria-label="영상 전체 화면"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
++      <button class="primary" id="capture"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>캡처</button>
+      </div>
+-     <div class="legend"><span><i style="background:var(--stand)"></i>서 있음</span><span><i style="background:var(--sit)"></i>앉아 있음</span><span><i style="background:var(--lie)"></i>누워 있음</span><span><i style="background:var(--unk)"></i>판단 불가</span></div>
++    </div>
++    <div class="view" id="viewBox">
++     <img alt="Go2 실시간 전방 영상" id="camera" style="width:100%;height:100%;object-fit:contain;visibility:hidden"/>
++     <div class="cameraempty" id="videoWaiting"><div class="scan"></div><span class="sig">NO SIGNAL</span><strong>미연결</strong><p>설정에서 Go2를 연결하면 영상이 표시됩니다</p></div>
++     <div class="hud" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
++     <div class="alertbanner hidden" id="lyingAlert" role="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>누워 있음 후보 감지 · 영상을 직접 확인하세요</div>
++     <div class="ovl livebadge hidden" id="liveBadge">LIVE</div>
++     <div class="ovl stamp" id="clock"></div>
++    </div>
++    <div class="vfoot">
++     <div class="stat"><span class="eyebrow">탐지된 사람</span><b id="peopleCount">–</b></div>
++     <div class="stat"><span class="eyebrow">로봇 제어 모드</span><b id="robotState">미연결</b></div>
++     <div class="stat"><span class="eyebrow">이번 순찰 기록</span><b id="sessionStat">0</b></div>
+     </div>
+    </div>
+ 
+-   <div class="card">
+-    <div class="cardhead"><h2>기록</h2><div class="recbar"><span id="recordingState" role="status">녹음 대기</span><button id="speechRecord">녹음 시작</button></div></div>
+-    <div class="cardbody quicknote">
+-     <textarea aria-label="관찰 기록" id="note" placeholder="관찰 내용을 짧게 기록하세요"></textarea>
+-     <button class="primary full" id="save">현재 장면과 함께 저장</button>
++   <aside class="inspector">
++    <div class="panel reveal">
++     <div class="phead"><h2>탐지된 사람</h2><span class="meta">관절 규칙 기반 후보</span></div>
++     <div class="pbody">
++      <div class="subjects" id="postureLive" role="status"><p class="subject-empty">영상이 연결되면 탐지된 사람의 자세가 표시됩니다.</p></div>
++      <div class="legend"><span><i style="background:var(--stand)"></i>서 있음</span><span><i style="background:var(--sit)"></i>앉아 있음</span><span><i style="background:var(--lie)"></i>누워 있음</span><span><i style="background:var(--unk)"></i>판단 불가</span></div>
++      <p class="confnote">막대는 사람 탐지 신뢰도이며 자세 확률이 아닙니다.</p>
++     </div>
+     </div>
+-   </div>
+-  </aside>
+- </div>
+ 
+- <section class="card main-highlights" id="report">
+-  <div class="cardhead">
+-   <div><h2>중요 기록·장면</h2><p class="cardsub">로컬 LLM이 저장 기록에서 먼저 확인할 장면을 고릅니다</p></div>
+-   <button class="primary" id="generate">선정</button>
+-  </div>
+-  <div class="progress hidden" id="llmProgress"><span></span></div>
+-  <div class="cardbody">
+-   <p class="note" id="llmStatus" role="status">저장된 기록에서 확인할 장면을 선정하세요.</p>
+-   <div id="highlightCards"><p class="empty">아직 선정 결과가 없습니다</p></div>
+-   <div class="actions"><button id="reportDownload">선정 결과 다운로드</button></div>
+-   <details class="summarydetails"><summary>이전 선정</summary><div id="summaryHistory"></div></details>
++    <div class="panel reveal">
++     <div class="phead"><h2>이번 순찰 기록</h2><div class="tools"><button class="ghost" id="goRecords">전체 보기</button></div></div>
++     <div class="pbody"><div class="events" id="events"><p class="subject-empty">이번 순찰에서 저장된 기록이 없습니다.</p></div></div>
++    </div>
++
++    <div class="panel reveal">
++     <div class="phead"><h2>메모</h2></div>
++     <div class="pbody memo">
++      <div class="recrow"><span id="recordingState" role="status">녹음 대기</span><button id="speechRecord">녹음 시작</button></div>
++      <textarea aria-label="관찰 기록" id="note" placeholder="관찰 내용을 짧게 기록하세요"></textarea>
++      <button class="primary full" id="save">현재 장면과 함께 저장</button>
++     </div>
++    </div>
++   </aside>
+   </div>
++
++  <section class="panel review reveal" id="report">
++   <div class="phead"><h2>검토 대기 장면</h2><span class="meta">로컬 LLM이 저장 기록에서 먼저 볼 장면을 고릅니다</span><div class="tools"><button class="primary" id="generate">선정</button></div><div class="progress hidden" id="llmProgress"><span></span></div></div>
++   <div class="pbody">
++    <p class="note" id="llmStatus" role="status">저장된 기록에서 확인할 장면을 선정하세요.</p>
++    <div id="highlightCards"><p class="empty">아직 선정 결과가 없습니다</p></div>
++    <div class="actions"><button id="reportDownload">선정 결과 다운로드</button></div>
++    <details class="summarydetails"><summary>이전 선정</summary><div id="summaryHistory"></div></details>
++   </div>
++  </section>
+  </section>
+-</section>
+-
+-<section class="hidden" id="archive">
+- <div class="card">
+-  <div class="cardhead"><div><h2>순찰 사건 기록</h2><p class="cardsub">자동·수동 기록과 음성 기록을 검토하고 메모합니다</p></div><button id="export">내보내기</button></div>
+-  <div class="searchAssist">
+-   <h3></h3>
+-   <div class="chips"><button data-target="person">사람 관찰 장면</button><button data-target="speech">음성 기록</button><button data-target="">전체 대상</button></div>
+-   <div class="actions"><label>현재 활동만 <input id="sessionOnly" type="checkbox"/></label><span class="sub" id="targetFilter">전체 대상</span></div>
+-  </div>
+-  <div class="filters">
+-   <label for="filter">표시</label>
+-   <select id="filter"><option value="all">전체 기록</option><option value="auto">자동 기록</option><option value="manual">수동 기록</option><option value="excluded">제외한 기록</option></select>
+-   <input aria-label="기록 검색" id="search" placeholder="제목·키워드·메모·자세 검색" type="text"/>
+-   <button id="reportTab">중요 장면 보기</button>
++
++ <section class="hidden" id="archive">
++  <div class="panel">
++   <div class="phead"><h2>순찰 사건 기록</h2><span class="meta">자동·수동 기록과 음성 기록</span><div class="tools"><button id="reportTab">검토 대기 장면</button><button id="export">내보내기</button></div></div>
++   <div class="toolbar">
++    <h3></h3>
++    <div class="seg"><button data-target="person">사람</button><button data-target="speech">음성</button><button data-target="">전체</button></div>
++    <span class="sub" id="targetFilter">전체 대상</span>
++    <select id="filter" aria-label="기록 종류"><option value="all">전체 기록</option><option value="auto">자동 기록</option><option value="manual">수동 기록</option><option value="excluded">제외한 기록</option></select>
++    <input aria-label="기록 검색" id="search" placeholder="제목·키워드·메모·자세 검색" type="text"/>
++    <label>이번 순찰만 <input id="sessionOnly" type="checkbox"/></label>
++   </div>
++   <div class="records" id="records"></div>
+   </div>
+-  <div class="records" id="records"></div>
++  <div class="notice foot">기록·영상은 실행 폴더의 data에 저장됩니다. 내보낸 JSON에는 영상 파일 자체가 포함되지 않습니다.</div>
++ </section>
+  </div>
+- <div class="notice archivefoot">기록·영상은 실행 폴더의 data에 저장됩니다. 내보낸 JSON에는 영상 파일 자체가 포함되지 않습니다.</div>
+-</section>
+-</main>
++</div>
++</div>
+ <div class="toast hidden" id="toast" role="status"></div>
+ 
+ <dialog aria-labelledby="settingsTitle" id="settingsDialog">
+- <div class="settingshead"><h2 id="settingsTitle">설정</h2><button aria-label="설정 닫기" id="closeSettings">닫기</button></div>
+- <div class="settingsgrid" id="settingsContents">
++ <div class="dhead"><h2 id="settingsTitle">설정</h2><button aria-label="설정 닫기" id="closeSettings">닫기</button></div>
++ <div class="dgrid" id="settingsContents">
+   <button id="connect">연결</button>
+-
+   <section class="sect">
+-   <div class="secttitle"><span class="num">01</span><h2>로봇 연결</h2></div>
++   <h3>로봇 연결</h3>
+    <div class="field"><label for="robotIp">Go2 IP</label>
+     <div class="inline"><input id="robotIp" type="text" value="192.168.0.101" style="flex:1"/><button class="primary" id="connect2">연결</button><button id="disconnect">해제</button></div></div>
+    <p class="note" id="connectionState" role="status">미연결</p>
+   </section>
+-
+   <section class="sect">
+-   <div class="secttitle"><span class="num">02</span><h2>조종</h2><span class="tiny" id="command">대기</span></div>
++   <h3>조종 <span class="tiny" id="command">대기</span></h3>
+    <div class="controlbody">
+     <div class="dpad">
+      <span></span><button aria-label="전진" data-cmd="전진" data-key="w">↑</button><span></span>
+@@ -365,15 +435,14 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+      <button aria-label="좌회전" data-cmd="좌회전" data-key="q">↶</button><button aria-label="후진" data-cmd="후진" data-key="s">↓</button><button aria-label="우회전" data-cmd="우회전" data-key="e">↷</button>
+     </div>
+     <div class="controlinfo">
+-     <div class="range"><label for="speed">설정 속도</label><input id="speed" max="0.4" min="0.1" step="0.1" type="range" value="0.2"/><span id="speedValue">0.2 m/s</span></div>
++     <div class="range"><label for="speed">속도</label><input id="speed" max="0.4" min="0.1" step="0.1" type="range" value="0.2"/><span id="speedValue">0.2 m/s</span></div>
+      <div class="pose"><button data-pose="StandUp">일어서기</button><button data-pose="StandDown">엎드리기</button><button class="stop" id="stop2">이동 정지</button></div>
+-     <p class="note">키보드: <span class="kbd">Shift</span> + <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 이동, <span class="kbd">Q</span><span class="kbd">E</span> 회전, <span class="kbd">Space</span> 정지</p>
++     <p class="note"><span class="kbd">Shift</span>+<span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 이동 · <span class="kbd">Q</span><span class="kbd">E</span> 회전 · <span class="kbd">Space</span> 정지</p>
+     </div>
+    </div>
+   </section>
+-
+   <section class="sect">
+-   <div class="secttitle"><span class="num">03</span><h2>자세 추정·자동 저장</h2></div>
++   <h3>자세 추정 · 자동 저장</h3>
+    <div class="field"><label for="visionModel">비전 모델</label>
+     <select id="visionModel"><option value="yolo11n-pose.pt">자세 추정 · Nano</option><option value="yolo11s-pose.pt">자세 추정 · Small</option><option value="yolo11n.pt">사람 탐지 · Nano</option></select></div>
+    <label class="switch"><input checked="" name="target" type="checkbox" value="person"/>사람만 관찰</label>
+@@ -382,22 +451,17 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+    <label class="switch"><input checked="" id="autoCapture" type="checkbox"/> 사람 등장 시 전후 영상 저장</label>
+    <div class="range"><label for="cooldown">최소 저장 간격</label><select id="cooldown"><option value="5">5초</option><option selected="" value="10">10초</option><option value="30">30초</option></select></div>
+    <button class="full" id="applyConfig">관찰 설정 적용</button>
+-   <div class="eventlist" id="events">수집한 기록이 표시됩니다.</div>
+-   <p class="note">서 있음·앉아 있음·누워 있음 후보 표시 · 가림 시 판단 불가</p>
+   </section>
+-
+   <section class="sect" id="speechSettings">
+-   <div class="secttitle"><span class="num">04</span><h2>수동 음성 기록</h2></div>
++   <h3>음성 기록</h3>
+    <div class="inline"><button class="primary" id="speechRecordSettings">녹음 시작</button>
+-    <label for="speechModel">STT 모델</label>
+-    <select id="speechModel"><option value="base">Base · 가벼움</option><option value="small" selected>Small · 기본</option><option value="medium">Medium · 느림</option></select>
++    <select id="speechModel" aria-label="STT 모델"><option value="base">STT Base · 가벼움</option><option value="small" selected>STT Small · 기본</option><option value="medium">STT Medium · 느림</option></select>
+     <button id="speechApply">모델 적용</button></div>
+    <p class="note" id="speechStatus" role="status">녹음 대기</p>
+    <p class="note">녹음 시작 → 종료·저장 → STT 자동 변환 · 최대 10분</p>
+   </section>
+-
+-  <section class="sect wide verification">
+-   <div class="secttitle"><span class="num">05</span><h2>관찰</h2><span class="tiny">수동 관찰 타이머 · 15초 경과 표시</span></div>
++  <section class="sect wide">
++   <h3>수동 관찰 <span class="tiny">15초 경과 표시</span></h3>
+    <div class="timerbox"><strong id="observationClock">00:00</strong><p id="timerStatus">수동</p><button id="timerStart">관찰 시작</button><button id="timerReset">초기화</button></div>
+    <details class="compactdetail"><summary>관찰 입력</summary><div class="detailbody">
+     <div class="fieldrow">
+@@ -409,15 +473,13 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+     <div class="field" style="margin-top:12px"><label>사용자가 직접 확인한 응답<input id="observedReply" maxlength="500" placeholder="예: ‘쉬고 있어요’라고 말함 / 발화자 불명확" type="text"/></label></div>
+    </div></details>
+   </section>
+-
+   <section class="sect">
+-   <div class="secttitle"><span class="num">06</span><h2>기록 옵션</h2></div>
++   <h3>기록 옵션</h3>
+    <div class="field"><label for="title">제목</label><input id="title" maxlength="100" placeholder="제목" type="text"/></div>
+    <div class="field"><label for="keywords">태그</label><input id="keywords" placeholder="쉼표로 구분" type="text"/></div>
+   </section>
+-
+   <section class="sect">
+-   <div class="secttitle"><span class="num">07</span><h2>LLM 선정</h2></div>
++   <h3>LLM 선정</h3>
+    <div class="field"><label for="model">LLM 모델</label><input id="model" type="text" value="qwen3.5:4b"/></div>
+    <div class="fieldrow">
+     <label for="highlightScope">선정 범위<select id="highlightScope"><option value="all">전체 저장 기록</option><option value="current">현재 순찰</option></select></label>
+@@ -425,24 +487,17 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(3px)}
+    </div>
+    <p class="note">관측 시각·발화 원문·사람 등장·자세 후보로 선정합니다.</p>
+   </section>
+-
+-  <div class="wide composer"><span hidden="" id="sessionCount">0</span><span hidden="" id="includedCount">0</span><button class="full" id="finish">기록 보기</button></div>
++  <div class="wide composer"><span hidden="" id="sessionCount">0</span><span hidden="" id="includedCount">0</span><button id="finish">기록 보기</button></div>
+  </div>
+ </dialog>
+ 
+ <dialog aria-labelledby="audioTitle" id="audioDialog">
+- <div class="settingshead"><h2 id="audioTitle">오디오 재생</h2><button id="closeAudio">닫기</button></div>
+- <div class="audioarea">
+-  <p class="note">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p>
+-  <div class="sect">
+-   <div class="secttitle"><span class="num">01</span><h2>파일 전송</h2></div>
+-   <div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div>
+-  </div>
+-  <div class="sect" style="margin-top:12px">
+-   <div class="secttitle"><span class="num">02</span><h2>재생</h2></div>
+-   <div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div>
+-  </div>
+-  <p class="note" id="audioStatus" role="status">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p>
++ <div class="dhead"><h2 id="audioTitle">안내 방송</h2><button id="closeAudio">닫기</button></div>
++ <div class="dbody">
++  <p class="note" style="margin:0">Go2 스피커 · WAV / MP3 · 30초 / 8MB 이하</p>
++  <section class="sect"><h3>파일 전송</h3><div class="audioupload"><input accept=".wav,.mp3,audio/wav,audio/mpeg" id="audioFile" type="file"/><button disabled="" id="audioUpload">로봇에 전송</button></div></section>
++  <section class="sect"><h3>재생</h3><div class="audioplay"><select aria-label="로봇에 저장된 음성" id="audioSelect"><option value="">목록을 불러오세요</option></select><button disabled="" id="audioList">새로고침</button><button class="primary" disabled="" id="audioPlay">재생</button><button disabled="" id="audioPause">일시정지</button></div></section>
++  <p class="note" id="audioStatus" role="status" style="margin:0">로봇 연결 후 파일을 전송하거나 목록을 조회하세요.</p>
+  </div>
+ </dialog>
+ <script>
+@@ -543,16 +598,21 @@ async function loadHistory(){try{
+  h.forEach(r=>{const b=text('button',new Date(r.time).toLocaleString('ko-KR')+' · '+r.content.selected_count+'건','source');b.onclick=()=>showHighlights(r);$('summaryHistory').append(b)});
+ }catch(e){toast(e.message)}}
+ $('reportDownload').onclick=()=>{if(!highlightResult){toast('선정 결과가 없습니다.');return}download(new Blob([JSON.stringify(highlightResult,null,2)],{type:'application/json;charset=utf-8'}),'k9-important-records.json')};
+-async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;$('events').replaceChildren();all.slice(0,3).forEach(x=>$('events').append(text('div',new Date(x.time).toLocaleTimeString('ko-KR')+' · '+x.title,'event')));if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
++async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;{const ev=all.slice(0,5),key=ev.map(x=>x.id+x.state).join();if($('events').dataset.key!==key){$('events').dataset.key=key;$('events').replaceChildren(...(ev.length?ev.map(x=>{const row=document.createElement('div');row.className='event '+(x.metadata?.event_kind==='speech'?'is-speech':'is-person');row.append(text('time',new Date(x.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),'event-t'),text('span',x.title,'event-title'));return row}):[text('p','이번 순찰에서 저장된 기록이 없습니다.','subject-empty')]))}}if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
+ 
+ function refreshPosture(v){
+  const e=$('postureLive'),people=v.video?v.detections.filter(d=>d.target==='person'):[];
+  const lying=people.some(d=>d.posture?.code==='lying');
+- $('peopleCount').textContent=v.video?people.length+'명':'-';
++ $('peopleCount').textContent=v.video?String(people.length):'–';
+  $('lyingAlert').classList.toggle('hidden',!lying);$('videoCard').classList.toggle('alerting',lying);
+- const items=!v.video?[['영상 연결 대기','p-wait','']]:people.length?people.map((d,i)=>['#'+(i+1)+' '+(d.posture?.label||'자세 모델 미사용'),'p-'+(d.posture?.code||'none'),d.posture?.reason||'']):[['사람 미탐지','p-none','']];
+- const key=JSON.stringify(items);if(e.dataset.key===key)return;e.dataset.key=key;
+- e.replaceChildren(...items.map(([label,cls,reason])=>{const c=text('span',label,'pchip '+cls);if(reason)c.title=reason;return c}));
++ const items=people.map((d,i)=>({n:i+1,code:d.posture?.code||'none',label:d.posture?.label||'자세 모델 미사용',reason:d.posture?.reason||'',conf:Math.round((d.confidence||0)*100)}));
++ const key=(v.video?'v':'x')+JSON.stringify(items.map(x=>[x.code,x.label,Math.round(x.conf/5)]));if(e.dataset.key===key)return;e.dataset.key=key;
++ if(!v.video){e.replaceChildren(text('p','영상이 연결되면 탐지된 사람의 자세가 표시됩니다.','subject-empty'));return}
++ if(!items.length){e.replaceChildren(text('p','화면에 탐지된 사람이 없습니다.','subject-empty'));return}
++ e.replaceChildren(...items.map(it=>{const row=document.createElement('div');row.className='subject p-'+it.code;
++  const top=document.createElement('div');top.className='subject-top';top.append(text('span','#'+it.n,'subject-n'),text('span',it.label,'subject-label'),text('span',it.conf+'%','subject-conf'));
++  const bar=document.createElement('div');bar.className='subject-bar';const fill=document.createElement('i');fill.style.setProperty('--w',it.conf+'%');bar.append(fill);
++  row.append(top,bar);if(it.reason)row.append(text('p',it.reason,'subject-reason'));return row}));
+ }
+ let speechSynced=false,lastSpeechSaved=null;
+ function refreshSpeech(s){
+@@ -605,23 +665,34 @@ $('closeSettings').onclick=()=>{stop();$('settingsDialog').close()};
+ $('settingsDialog').addEventListener('cancel',stop);
+ $('settingsDialog').addEventListener('close',stop);
+ </script><script>
+-/* 화면 상태 표시 (디자인 개선판): 기존 동작은 바꾸지 않고 state 값만 읽어 칩·진행 표시를 갱신 */
++/* 화면 표시 보강 (디자인 개선판): 서버 호출·조종 로직은 건드리지 않고 state 값만 읽어 표시 */
+ (()=>{
+- const chip=(id,s,label)=>{const c=$(id);if(!c)return;c.dataset.state=s;const t=c.querySelector('.label');if(t&&label!==undefined)t.textContent=label};
++ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
++ const setV=(el,text)=>{if(!el||el.textContent===text)return;el.textContent=text;if(reduce)return;el.classList.remove('tick');void el.offsetWidth;el.classList.add('tick')};
++ const cell=(id,s,label)=>{const c=$(id);if(!c)return;c.dataset.state=s;if(label!==undefined)setV(c.querySelector('.label'),label)};
+  function paint(){
+   const lost=$('badge').textContent.includes('끊김');
+-  if(!state||lost){chip('chipRobot',lost?'err':'off');return}
++  if(!state||lost){cell('chipRobot',lost?'err':'off');return}
+   const r=state.robot,v=state.vision,l=state.llm,sp=state.speech;
+-  chip('chipRobot',r.connecting?'busy':r.connected?'ok':'off');
+-  chip('chipVideo',v.video?'ok':'off',v.video?'수신':'없음');
+-  chip('chipDetect',v.detector_error?'err':v.detecting?'ok':'off',v.detector_error?'오류':v.detecting?'추정 중':'대기');
+-  chip('chipLlm',l.error?'err':l.busy?'busy':'off',l.error?'오류':l.busy?'선정 중 '+(l.elapsed_seconds||0)+'s':'대기');
+-  chip('chipRec',sp?.recording?'rec':'off',sp?.recording?'녹음 중':'대기');
++  cell('chipRobot',r.connecting?'busy':r.connected?'ok':'off');
++  cell('chipVideo',v.video?'ok':'off',v.video?'수신':'없음');
++  cell('chipDetect',v.detector_error?'err':v.detecting?'ok':'off',v.detector_error?'오류':v.detecting?'추정 중':'대기');
++  cell('chipLlm',l.error?'err':l.busy?'busy':'off',l.error?'오류':l.busy?'선정 중 '+(l.elapsed_seconds||0)+'s':'대기');
++  cell('chipRec',sp?.recording?'rec':'off',sp?.recording?'녹음 중':'대기');
+   $('liveBadge').classList.toggle('hidden',!v.video);
+   $('llmProgress').classList.toggle('hidden',!l.busy);
++  setV($('sessionStat'),$('sessionCount').textContent);
+  }
+  setInterval(paint,500);paint();
++ // 값이 바뀔 때만 가볍게 움직이는 숫자
++ new MutationObserver(()=>{const e=$('peopleCount');if(reduce)return;e.classList.remove('tick');void e.offsetWidth;e.classList.add('tick')}).observe($('peopleCount'),{childList:true,characterData:true,subtree:true});
++ // 스크롤하면 상단 막대만 반투명 유리로
+  const onScroll=()=>document.body.classList.toggle('scrolled',scrollY>4);addEventListener('scroll',onScroll,{passive:true});onScroll();
++ // 패널 위에서 커서를 따라가는 옅은 빛
++ addEventListener('pointermove',e=>{const p=e.target.closest?.('.panel');if(!p)return;const b=p.getBoundingClientRect();p.style.setProperty('--mx',(e.clientX-b.left)+'px');p.style.setProperty('--my',(e.clientY-b.top)+'px')},{passive:true});
++ // 탭 전환은 브라우저 view transition으로 부드럽게 (지원하지 않으면 기존 그대로)
++ if(document.startViewTransition&&!reduce){const base=view;view=name=>document.startViewTransition(()=>base(name))}
++ $('goRecords').onclick=()=>$('recordsTab').click();
+  $('fullscreenBtn').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else $('viewBox').requestFullscreen?.()};
+ })();
+ </script></body></html>
+-- 
+2.39.5 (Apple Git-154)
+

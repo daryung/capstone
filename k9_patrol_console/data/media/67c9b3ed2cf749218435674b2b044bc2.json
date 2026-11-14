@@ -1,0 +1,25 @@
+{
+  "event_kind": "speech",
+  "source": "robot_microphone",
+  "record_mode": "manual",
+  "started_at": "2026-11-14T02:34:29.662523+00:00",
+  "ended_at": "2026-11-14T02:34:32.136494+00:00",
+  "model": "small",
+  "duration_seconds": 2.6,
+  "stop_reason": "사용자 종료",
+  "transcript": "불안해 불안해 불안해",
+  "segments": [
+    {
+      "start_seconds": 0.43,
+      "end_seconds": 2.43,
+      "text": "불안해 불안해 불안해"
+    }
+  ],
+  "speaker": "미확인",
+  "position_status": "미수신",
+  "timestamp_basis": "PC reception estimate, not robot capture clock",
+  "snapshot_timing": "녹음 종료 시점",
+  "review_required": true,
+  "note": "수동 녹음의 자동 STT 결과. 원본 음성으로 확인하세요.",
+  "text_file": "67c9b3ed2cf749218435674b2b044bc2.txt"
+}
