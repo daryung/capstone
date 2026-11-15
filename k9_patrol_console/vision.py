@@ -10,6 +10,7 @@ import time
 import uuid
 
 from posture_rules import classify_posture,draw_postures
+import rotate_detect
 
 TARGET_IDS={'person':0,'backpack':24,'handbag':26,'suitcase':28}
 
@@ -121,6 +122,14 @@ class Vision:
                     item['posture']=classify_posture(item['keypoints'],item['xyxy'])
                     item['pose_status']=item['posture']['label']
                 detections.append(item)
+        # 누운 사람은 원본 영상에서 사람으로 잡히지 않는 경우가 많아, 90도 돌린 영상으로 한 번 더 찾는다.
+        if rotate_detect.ENABLED and 'person' in config['targets'] and r.keypoints is not None:
+            self.rotate_turn='ccw' if getattr(self,'rotate_turn','ccw')=='cw' else 'cw'
+            for turn in (('cw','ccw') if rotate_detect.BOTH else (self.rotate_turn,)):
+                for item in rotate_detect.rotated_people(self.model,image,config['confidence'],detections,turn,TARGET_IDS['person']):
+                    item['posture']=classify_posture(item['keypoints'],item['xyxy'])
+                    item['pose_status']=item['posture']['label']
+                    detections.append(item)
         # Annotations belong to this analyzed frame, not an unrelated newer frame.
         return detections,self.encode(draw_postures(r.plot(),detections))
 
