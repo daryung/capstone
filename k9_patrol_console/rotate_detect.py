@@ -8,12 +8,31 @@
 K9_ROTATE_DETECT=1 (기본): 호출할 때마다 한쪽 방향만 돌린다(시계/반시계 번갈아). 추론 시간 약 2배.
 K9_ROTATE_DETECT=2: 매번 양쪽 방향 모두 돌린다. 추론 시간 약 3배, 누운 사람을 가장 많이 잡는다.
 K9_ROTATE_DETECT=0: 끔.
+
+언제 돌릴지 (K9_ROTATE_WHEN, 실시간이 버거울 때 줄이기 위함)
+  always   : 매 프레임 (기존 방식)
+  unknown  : 사람이 잡혔는데 자세가 판단 불가인 프레임만 ('너무 가까움'은 제외)
+  unknown_or_empty (기본): 위 경우 + 사람이 아무도 안 잡힌 프레임.
+             누운 사람은 원본에서 아예 검출되지 않는 경우가 많아(11/14 누운 27장 중 18장) 함께 돌린다.
 """
 import os
 
 MODE = os.environ.get('K9_ROTATE_DETECT', '1')
 ENABLED = MODE != '0'
 BOTH = MODE == '2'
+WHEN = os.environ.get('K9_ROTATE_WHEN', 'unknown_or_empty')
+
+
+def should_run(detections, when=None):
+    """이번 프레임에서 회전 검출을 돌릴지. detections: 원본 영상의 사람 검출(posture 포함)."""
+    when = when or WHEN
+    if when == 'always':
+        return True
+    people = [d for d in detections if d.get('target') == 'person']
+    if not people:
+        return when == 'unknown_or_empty'
+    return any(d.get('posture', {}).get('code') == 'unknown' and not d['posture'].get('metrics', {}).get('too_close')
+               for d in people)
 
 
 def _iou(a, b):

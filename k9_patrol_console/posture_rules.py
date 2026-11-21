@@ -8,6 +8,7 @@ v2와 다른 점
 라벨은 자세 후보이며 낙상·의식·건강 상태를 뜻하지 않는다.
 """
 import math
+import os
 
 LABELS = {'standing': '서 있음 후보', 'sitting': '앉아 있음 후보',
           'lying': '누워 있음 후보', 'unknown': '판단 불가'}
@@ -16,6 +17,8 @@ STAND_SHARE = .40   # 골반→발목 세로 길이 중 허벅지(골반→무�
 SIT_SHARE = .35
 FLOOR_RATIO = .45
 TOO_CLOSE_LABEL = '너무 가까움'
+# 다리만 보일 때 서 있음으로 볼지. 팀 결정(11/17): 사람이 봐도 애매하므로 판단 불가로 둔다.
+SHIN_ONLY = os.environ.get('K9_SHIN_ONLY', '0') == '1'
 TORSO_PER_SHOULDER = 1.4   # 몸통 길이 / 어깨 너비 (성인 평균에 가까운 값)
 LYING_ELEVATION = 45       # 몸통이 바닥에서 일어선 각도가 이 이하면 누움 쪽으로 본다
 FORESHORTEN = .7   # 몸통 길이 / 어깨 너비가 이보다 작으면 몸통이 카메라 방향으로 놓인 것으로 본다   # 골반→발목 세로 길이 / 몸통 길이
@@ -50,7 +53,7 @@ def torso_elevation(dx, dy, shoulder_w, ratio=TORSO_PER_SHOULDER):
     return math.degrees(math.asin(math.sqrt(min(max(u, 0.), 1.))))
 
 
-def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
+def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=SHIN_ONLY):
     result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
                   method='coco17_rules_v3.5', keypoint_threshold=min_conf)
 

@@ -4,6 +4,7 @@ Never starts recording on launch, reconnect, model change, or speaker pause.
 import asyncio
 from datetime import datetime, timezone
 import json
+import os
 import queue
 import threading
 import time
@@ -183,8 +184,11 @@ class SpeechRecorder:
                 self.model=None;self.model_name=None
                 self.model=WhisperModel(meta['model'],device='cpu',compute_type='int8',cpu_threads=2)
                 self.model_name=meta['model']
+            # 구조 요청 단어 힌트(K9_STT_HOTWORDS). 비워 두면 기존과 같다. 적용 전후 비교는 eval/stt_hotwords_ab.py.
+            hot=os.environ.get('K9_STT_HOTWORDS','').strip() or None
+            meta['stt_hotwords']=hot or ''
             segments,_=self.model.transcribe(str(path),language='ko',task='transcribe',
-                                            beam_size=5,vad_filter=True,condition_on_previous_text=False)
+                                            beam_size=5,vad_filter=True,condition_on_previous_text=False,hotwords=hot)
             meta['segments']=[dict(start_seconds=round(s.start,3),end_seconds=round(s.end,3),text=s.text.strip())
                               for s in segments if s.text.strip()]
             meta['transcript']='\n'.join(s['text'] for s in meta['segments'])

@@ -11,6 +11,7 @@ import uuid
 
 from posture_rules import classify_posture,draw_postures
 import rotate_detect
+from perf_meter import PerfMeter
 
 TARGET_IDS={'person':0,'backpack':24,'handbag':26,'suitcase':28}
 
@@ -35,6 +36,7 @@ class Vision:
         self.last_saved={}
         self.config=dict(model=os.environ.get('K9_YOLO_MODEL','yolo11n-pose.pt'),targets=['person'],confidence=.45,auto=True,cooldown=10,pre=3,post=3)
         self.info=dict(video=False,detecting=False,detector_error='',video_error='',record_error='',detections=[],last_frame=0.,model_path=self.config['model'])
+        self.fps=PerfMeter(self.store.root if hasattr(self.store,'root') else None)
         self.loop=None
         self.tasks=[]
 
@@ -123,7 +125,9 @@ class Vision:
                     item['pose_status']=item['posture']['label']
                 detections.append(item)
         # 누운 사람은 원본 영상에서 사람으로 잡히지 않는 경우가 많아, 90도 돌린 영상으로 한 번 더 찾는다.
-        if rotate_detect.ENABLED and 'person' in config['targets'] and r.keypoints is not None:
+        self.rotate_ran=False
+        if rotate_detect.ENABLED and 'person' in config['targets'] and r.keypoints is not None and rotate_detect.should_run(detections):
+            self.rotate_ran=True
             self.rotate_turn='ccw' if getattr(self,'rotate_turn','ccw')=='cw' else 'cw'
             for turn in (('cw','ccw') if rotate_detect.BOTH else (self.rotate_turn,)):
                 for item in rotate_detect.rotated_people(self.model,image,config['confidence'],detections,turn,TARGET_IDS['person']):
@@ -153,9 +157,14 @@ class Vision:
                 if latest is None or latest[0]==previous:
                     await asyncio.sleep(.03);continue
                 previous,image=latest
+                t0=time.monotonic()
                 det,jpg=await asyncio.to_thread(self.infer,image,config)
                 now=time.monotonic()
-                with self.lock:self.jpeg=jpg;self.info['detections']=det
+                self.fps.add(now,now-t0,getattr(self,'rotate_ran',False))
+                with self.lock:
+                    self.jpeg=jpg
+                    self.info['detections']=det
+                    self.info['perf']=self.fps.summary()
                 seen={d['target'] for d in det}
                 for target in config['targets']:
                     if target in seen:

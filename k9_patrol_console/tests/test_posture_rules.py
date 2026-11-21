@@ -31,7 +31,8 @@ class Rules(unittest.TestCase):
         self.assertEqual(r['code'],'unknown');self.assertIn('너무 가깝거나',r['reason']);self.assertEqual(r['label'],'너무 가까움')
     def test_shin_only_can_be_turned_off(self):
         k=kp({13:(662,208),14:(862,214),15:(628,495),16:(812,521)})
-        self.assertEqual(classify_posture(k,[526,0,957,540])['code'],'standing')
+        self.assertEqual(classify_posture(k,[526,0,957,540])['code'],'unknown')  # 기본값: 판단 불가 (11/17 팀 결정)
+        self.assertEqual(classify_posture(k,[526,0,957,540],shin_only=True)['code'],'standing')
         self.assertEqual(classify_posture(k,[526,0,957,540],shin_only=False)['code'],'unknown')
     def test_bad_input(self):
         self.assertEqual(classify_posture(None,None)['code'],'unknown')
